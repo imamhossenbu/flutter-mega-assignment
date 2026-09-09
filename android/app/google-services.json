@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "257897538766",
+    "project_id": "flutter-mega-assignment",
+    "storage_bucket": "flutter-mega-assignment.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:257897538766:android:1f86f86ebdd170a73d9c9f",
+        "android_client_info": {
+          "package_name": "com.example.flutter_mega_assignment"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_JkZEIh4gE5Yd8LbOSE9DclmsRBuQ3ko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
