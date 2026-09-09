@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# APK binaries (hosted via cloud download links)
+*.apk
+downloads/*.apk

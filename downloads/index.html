@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download MegaStore App (APK)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #ec4899;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .container {
+      max-width: 520px;
+      width: 100%;
+      background: var(--card-bg);
+      border-radius: 28px;
+      padding: 32px 28px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: center;
+    }
+    .logo-badge {
+      width: 68px;
+      height: 68px;
+      background: linear-gradient(135deg, #4f46e5, #ec4899);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 18px;
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+    }
+    .logo-badge svg {
+      width: 36px;
+      height: 36px;
+      fill: white;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .tagline {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 24px;
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .btn-download {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: var(--primary);
+      color: white;
+      text-decoration: none;
+      padding: 16px 24px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4);
+      margin-bottom: 12px;
+    }
+    .btn-download:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      display: block;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px;
+      transition: color 0.2s;
+    }
+    .btn-secondary:hover {
+      color: white;
+    }
+    .meta-box {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-top: 20px;
+      text-align: left;
+      font-size: 13px;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .meta-row:last-child { border-bottom: none; }
+    .meta-label { color: var(--text-muted); }
+    .meta-val { font-weight: 600; }
+    .screenshot-preview {
+      margin-top: 24px;
+      text-align: center;
+    }
+    .screenshot-preview img {
+      max-width: 220px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      border: 4px solid #334155;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="logo-badge">
+    <svg viewBox="0 0 24 24">
+      <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+    </svg>
+  </div>
+
+  <h1>MegaStore Mobile App</h1>
+  <p class="tagline">Flutter & Firebase E-Commerce Edition</p>
+
+  <div class="status-badge">
+    <span class="pulse-dot"></span>
+    Tested & Verified on Android 15
+  </div>
+
+  <a href="MegaStore-arm64.apk" download="MegaStore-release-19MB.apk" class="btn-download">
+    <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+    </svg>
+    Download Release APK (19.9 MB)
+  </a>
+
+  <a href="MegaStore-arm32.apk" download="MegaStore-arm32.apk" class="btn-secondary">
+    Download 32-bit Legacy APK (17.5 MB)
+  </a>
+
+  <div class="meta-box">
+    <div class="meta-row">
+      <span class="meta-label">Version</span>
+      <span class="meta-val">1.0.0 (Release)</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Backend</span>
+      <span class="meta-val">Firebase Firestore + Auth</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Compatibility</span>
+      <span class="meta-val">Android 5.0+ (Lollipop to Android 15)</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Features</span>
+      <span class="meta-val">Wishlist, Cart, Live Filter & Search</span>
+    </div>
+  </div>
+
+  <div class="screenshot-preview">
+    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">LIVE APP RUNNING</p>
+    <img src="screenshot.png" alt="App Screenshot">
+  </div>
+</div>
+
+</body>
+</html>
