@@ -1,0 +1,238 @@
+import 'package:flutter/material.dart';
+import '../../models/product_model.dart';
+
+class CategoryItem {
+  final String id;
+  final String name;
+  final IconData icon;
+
+  const CategoryItem({
+    required this.id,
+    required this.name,
+    required this.icon,
+  });
+}
+
+class PromoBanner {
+  final String title;
+  final String subtitle;
+  final String discount;
+  final String imageUrl;
+  final Color backgroundColor;
+
+  const PromoBanner({
+    required this.title,
+    required this.subtitle,
+    required this.discount,
+    required this.imageUrl,
+    required this.backgroundColor,
+  });
+}
+
+class AppConstants {
+  static const List<CategoryItem> categories = [
+    CategoryItem(id: 'All', name: 'All', icon: Icons.grid_view_rounded),
+    CategoryItem(id: 'Electronics', name: 'Electronics', icon: Icons.devices_rounded),
+    CategoryItem(id: 'Footwear', name: 'Footwear', icon: Icons.roller_skating_outlined),
+    CategoryItem(id: 'Audio', name: 'Audio', icon: Icons.headphones_rounded),
+    CategoryItem(id: 'Watches', name: 'Watches', icon: Icons.watch_outlined),
+    CategoryItem(id: 'Fashion', name: 'Fashion', icon: Icons.checkroom_rounded),
+  ];
+
+  static const List<PromoBanner> promoBanners = [
+    PromoBanner(
+      title: 'Mega Summer Sale',
+      subtitle: 'Premium Tech & Gear',
+      discount: 'UP TO 40% OFF',
+      imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
+      backgroundColor: Color(0xFF312E81),
+    ),
+    PromoBanner(
+      title: 'Fresh Sneakers Drop',
+      subtitle: 'Style Meets Comfort',
+      discount: 'NEW ARRIVALS',
+      imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
+      backgroundColor: Color(0xFF831843),
+    ),
+    PromoBanner(
+      title: 'Smart Wearables',
+      subtitle: 'Track Your Health Today',
+      discount: 'EXTRA 20% OFF',
+      imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
+      backgroundColor: Color(0xFF064E3B),
+    ),
+  ];
+
+  static List<ProductModel> get initialProducts => [
+    ProductModel(
+      id: 'prod_1',
+      name: 'Sony WH-1000XM5 Wireless Headphones',
+      brand: 'Sony',
+      category: 'Audio',
+      price: 349.99,
+      originalPrice: 399.99,
+      rating: 4.8,
+      reviewCount: 342,
+      imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
+      description: 'Industry-leading noise cancellation with two processors and eight microphones. Exceptional sound quality with newly developed 30mm driver unit and crystal-clear hands-free calling.',
+      colors: ['Black', 'Silver', 'Midnight Blue'],
+      sizes: ['Standard'],
+      isFeatured: true,
+      inStock: true,
+      stockCount: 15,
+    ),
+    ProductModel(
+      id: 'prod_2',
+      name: 'Nike Air Max 270 React Sneakers',
+      brand: 'Nike',
+      category: 'Footwear',
+      price: 159.99,
+      originalPrice: 180.00,
+      rating: 4.7,
+      reviewCount: 289,
+      imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
+      description: 'The Nike Air Max 270 React blends artful materials with responsive Nike React foam cushioning and a large Max Air unit for smooth, ultra-comfortable stride throughout the day.',
+      colors: ['Red', 'White', 'Black'],
+      sizes: ['US 8', 'US 9', 'US 10', 'US 11'],
+      isFeatured: true,
+      inStock: true,
+      stockCount: 22,
+    ),
+    ProductModel(
+      id: 'prod_3',
+      name: 'Apple Watch Ultra 2 Titanium Case',
+      brand: 'Apple',
+      category: 'Watches',
+      price: 799.00,
+      originalPrice: 849.00,
+      rating: 4.9,
+      reviewCount: 512,
+      imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
+      description: 'The most rugged and capable Apple Watch. Built for outdoor adventures and endurance workouts with a lightweight 49mm titanium case, extra-long battery life, and high-precision GPS.',
+      colors: ['Titanium Natural', 'Dark Titanium'],
+      sizes: ['49mm'],
+      isFeatured: true,
+      inStock: true,
+      stockCount: 8,
+    ),
+    ProductModel(
+      id: 'prod_4',
+      name: 'Apple MacBook Pro 14" M3 Pro',
+      brand: 'Apple',
+      category: 'Electronics',
+      price: 1999.00,
+      originalPrice: 2099.00,
+      rating: 4.9,
+      reviewCount: 190,
+      imageUrl: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&q=80',
+      description: 'Empowered by M3 Pro chip featuring up to 12-core CPU and 18-core GPU. Liquid Retina XDR display with ProMotion and battery life up to 18 hours.',
+      colors: ['Space Black', 'Silver'],
+      sizes: ['512GB SSD', '1TB SSD'],
+      isFeatured: true,
+      inStock: true,
+      stockCount: 5,
+    ),
+    ProductModel(
+      id: 'prod_5',
+      name: 'JBL Charge 5 Portable Bluetooth Speaker',
+      brand: 'JBL',
+      category: 'Audio',
+      price: 139.95,
+      originalPrice: 179.95,
+      rating: 4.6,
+      reviewCount: 420,
+      imageUrl: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80',
+      description: 'Take the party with you no matter what the weather. The JBL Charge 5 speaker delivers bold JBL Original Pro Sound with optimized long-excursion driver and separate tweeter.',
+      colors: ['Teal', 'Squad Camo', 'Black'],
+      sizes: ['Standard'],
+      isFeatured: false,
+      inStock: true,
+      stockCount: 30,
+    ),
+    ProductModel(
+      id: 'prod_6',
+      name: 'Classic Minimalist Leather Chronograph',
+      brand: 'Fossil',
+      category: 'Watches',
+      price: 129.00,
+      originalPrice: 165.00,
+      rating: 4.5,
+      reviewCount: 118,
+      imageUrl: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=800&q=80',
+      description: 'Timeless silhouette featuring a rich brown genuine leather strap, sunray blue dial, and Japanese quartz chronograph movement. Water-resistant up to 50 meters.',
+      colors: ['Brown / Navy', 'Black / Silver'],
+      sizes: ['42mm'],
+      isFeatured: false,
+      inStock: true,
+      stockCount: 12,
+    ),
+    ProductModel(
+      id: 'prod_7',
+      name: 'Urban Tech Water-Resistant Backpack',
+      brand: 'Bellroy',
+      category: 'Fashion',
+      price: 119.00,
+      originalPrice: 140.00,
+      rating: 4.8,
+      reviewCount: 88,
+      imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&q=80',
+      description: 'Designed for daily commute and urban travel. Features padded 16-inch laptop pocket, hidden quick-access pocket for passport, and water-resistant recycled fabric construction.',
+      colors: ['Charcoal', 'Olive', 'Navy'],
+      sizes: ['20 Liters'],
+      isFeatured: false,
+      inStock: true,
+      stockCount: 18,
+    ),
+    ProductModel(
+      id: 'prod_8',
+      name: 'Sony PlayStation 5 DualSense Wireless Controller',
+      brand: 'Sony',
+      category: 'Electronics',
+      price: 69.99,
+      originalPrice: 74.99,
+      rating: 4.9,
+      reviewCount: 650,
+      imageUrl: 'https://images.unsplash.com/photo-1606318801954-d46d46d3360a?w=800&q=80',
+      description: 'Discover a deeper gaming experience with the innovative PS5 controller. Haptic feedback, adaptive triggers, and built-in microphone integrated into an iconic design.',
+      colors: ['White', 'Cosmic Red', 'Midnight Black'],
+      sizes: ['Standard'],
+      isFeatured: false,
+      inStock: true,
+      stockCount: 25,
+    ),
+    ProductModel(
+      id: 'prod_9',
+      name: 'Adidas Originals Superstar Shoes',
+      brand: 'Adidas',
+      category: 'Footwear',
+      price: 95.00,
+      originalPrice: 110.00,
+      rating: 4.6,
+      reviewCount: 310,
+      imageUrl: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?w=800&q=80',
+      description: 'The legendary silhouette with signature shell-toe design. Crafted from smooth leather with serrated 3-Stripes and authentic rubber cupsole.',
+      colors: ['White / Black', 'All White', 'Black / White'],
+      sizes: ['US 7', 'US 8', 'US 9', 'US 10', 'US 11'],
+      isFeatured: false,
+      inStock: true,
+      stockCount: 14,
+    ),
+    ProductModel(
+      id: 'prod_10',
+      name: 'Premium Cotton Oversized Hoodie',
+      brand: 'Essential Studio',
+      category: 'Fashion',
+      price: 59.99,
+      originalPrice: 79.99,
+      rating: 4.4,
+      reviewCount: 76,
+      imageUrl: 'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&q=80',
+      description: '450 GSM heavyweight French Terry cotton. Double-lined hood, dropped shoulders, and ribbed cuffs for an elevated casual streetwear aesthetic.',
+      colors: ['Heather Gray', 'Pitch Black', 'Sand Khaki'],
+      sizes: ['S', 'M', 'L', 'XL'],
+      isFeatured: false,
+      inStock: true,
+      stockCount: 20,
+    ),
+  ];
+}
