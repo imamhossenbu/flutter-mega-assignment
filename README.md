@@ -12,6 +12,18 @@ Download and test the release APK directly on any Android device:
 
 ---
 
+## 📸 App Screenshots
+
+| 1. Explore & Home | 2. Filter & Sort Modal | 3. Product Details | 4. Wishlist Screen |
+|:---:|:---:|:---:|:---:|
+| <img src="screenshots/01_home_screen.png" width="230" alt="Home Screen" /> | <img src="screenshots/02_filter_modal.png" width="230" alt="Filter Modal" /> | <img src="screenshots/03_product_details.png" width="230" alt="Product Details" /> | <img src="screenshots/04_wishlist_screen.png" width="230" alt="Wishlist" /> |
+
+| 5. Shopping Cart | 6. Checkout & Payment | 7. Order Confirmation | 8. Firebase & Settings |
+|:---:|:---:|:---:|:---:|
+| <img src="screenshots/05_cart_screen.png" width="230" alt="Cart Screen" /> | <img src="screenshots/06_checkout_modal.png" width="230" alt="Checkout Modal" /> | <img src="screenshots/07_order_success.png" width="230" alt="Order Success" /> | <img src="screenshots/08_profile_screen.png" width="230" alt="Profile Screen" /> |
+
+---
+
 ## ✨ Features
 
 - **🔥 Firebase Backend Integration**:
