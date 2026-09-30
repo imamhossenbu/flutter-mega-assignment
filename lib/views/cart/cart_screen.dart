@@ -1,9 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/cart_provider.dart';
-import 'checkout_dialog.dart';
+import '../orders/checkout_screen.dart';
 
 class CartScreen extends StatefulWidget {
   final VoidCallback? onExploreTap;
@@ -139,8 +140,9 @@ class _CartScreenState extends State<CartScreen> {
                                 ),
                                 const SizedBox(width: 10),
                                 ElevatedButton(
-                                  onPressed: () {
-                                    final success = cartProvider.applyPromoCode(_couponController.text);
+                                  onPressed: () async {
+                                    final success = await cartProvider.applyPromoCode(_couponController.text);
+                                    if (!context.mounted) return;
                                     if (success) {
                                       _couponController.clear();
                                       ScaffoldMessenger.of(context).showSnackBar(
@@ -275,7 +277,9 @@ class _CartScreenState extends State<CartScreen> {
                     const SizedBox(width: 20),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => CheckoutDialog.show(context),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+                        ),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
@@ -317,17 +321,28 @@ class _CartScreenState extends State<CartScreen> {
             // Image
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: CachedNetworkImage(
-                imageUrl: product.imageUrl,
-                width: 80,
-                height: 80,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: Colors.grey.shade100,
-                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                ),
-                errorWidget: (context, url, error) => const Icon(Icons.broken_image_outlined),
-              ),
+              child: kIsWeb
+                  ? Image.network(
+                      product.imageUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 80, height: 80, color: Colors.grey.shade100,
+                        child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: product.imageUrl,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey.shade100,
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                      errorWidget: (context, url, error) => const Icon(Icons.broken_image_outlined),
+                    ),
             ),
             const SizedBox(width: 14),
 

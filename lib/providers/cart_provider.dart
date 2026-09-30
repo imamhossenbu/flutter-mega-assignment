@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/cart_item_model.dart';
 import '../models/product_model.dart';
+import '../models/promo_code_model.dart';
 import '../services/firebase_service.dart';
 
 class CartProvider extends ChangeNotifier {
@@ -10,12 +11,16 @@ class CartProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _appliedPromoCode;
   double _promoDiscountPercent = 0.0;
+  PromoCodeModel? _appliedPromo;
+  bool _isValidatingPromo = false;
   StreamSubscription? _subscription;
 
   List<CartItemModel> get items => List.unmodifiable(_items);
   bool get isLoading => _isLoading;
   String? get appliedPromoCode => _appliedPromoCode;
   double get promoDiscountPercent => _promoDiscountPercent;
+  PromoCodeModel? get appliedPromo => _appliedPromo;
+  bool get isValidatingPromo => _isValidatingPromo;
 
   int get itemCount => _items.length;
   int get totalQuantity => _items.fold(0, (sum, item) => sum + item.quantity);
@@ -165,25 +170,49 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  bool applyPromoCode(String code) {
-    final normalized = code.trim().toUpperCase();
-    if (normalized == 'MEGA20' || normalized == 'SAVE20') {
-      _appliedPromoCode = normalized;
-      _promoDiscountPercent = 0.20;
+  Future<bool> applyPromoCode(String code) async {
+    _isValidatingPromo = true;
+    notifyListeners();
+    try {
+      // Validate against Firestore first
+      final promo = await FirebaseService.instance.validatePromoCode(code);
+      if (promo != null) {
+        _appliedPromo = promo;
+        _appliedPromoCode = promo.code;
+        _promoDiscountPercent = promo.discountPercent;
+        _isValidatingPromo = false;
+        notifyListeners();
+        return true;
+      }
+      // Fallback: hardcoded codes
+      final normalized = code.trim().toUpperCase();
+      if (normalized == 'MEGA20' || normalized == 'SAVE20') {
+        _appliedPromoCode = normalized;
+        _promoDiscountPercent = 0.20;
+        _isValidatingPromo = false;
+        notifyListeners();
+        return true;
+      } else if (normalized == 'WELCOME10') {
+        _appliedPromoCode = normalized;
+        _promoDiscountPercent = 0.10;
+        _isValidatingPromo = false;
+        notifyListeners();
+        return true;
+      }
+      _isValidatingPromo = false;
       notifyListeners();
-      return true;
-    } else if (normalized == 'WELCOME10') {
-      _appliedPromoCode = normalized;
-      _promoDiscountPercent = 0.10;
+      return false;
+    } catch (e) {
+      _isValidatingPromo = false;
       notifyListeners();
-      return true;
+      return false;
     }
-    return false;
   }
 
   void removePromoCode() {
     _appliedPromoCode = null;
     _promoDiscountPercent = 0.0;
+    _appliedPromo = null;
     notifyListeners();
   }
 

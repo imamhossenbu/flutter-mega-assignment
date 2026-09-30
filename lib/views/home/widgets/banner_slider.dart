@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
@@ -90,10 +91,16 @@ class _BannerSliderState extends State<BannerSlider> {
                             ).createShader(rect);
                           },
                           blendMode: BlendMode.dstIn,
-                          child: CachedNetworkImage(
-                            imageUrl: banner.imageUrl,
-                            fit: BoxFit.cover,
-                          ),
+                          child: kIsWeb
+                              ? Image.network(
+                                  banner.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stack) => const SizedBox(),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: banner.imageUrl,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
                       ),
 

@@ -47,3 +47,4 @@ app.*.map.json
 # APK binaries (hosted via cloud download links)
 *.apk
 downloads/*.apk
+test_screen.png

@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/product_model.dart';
+import '../../models/review_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/review_provider.dart';
 import '../../providers/wishlist_provider.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -33,6 +37,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     if (widget.product.sizes.isNotEmpty) {
       _selectedSize = widget.product.sizes.first;
     }
+    // Start listening to reviews
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ReviewProvider>().listenToReviews(widget.product.id);
+    });
+  }
+
+  @override
+  void dispose() {
+    context.read<ReviewProvider>().stopListening(widget.product.id);
+    super.dispose();
   }
 
   @override
@@ -97,18 +111,36 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 children: [
                   Hero(
                     tag: 'product_image_${product.id}',
-                    child: CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: Colors.grey.shade100,
-                        child: const Center(child: CircularProgressIndicator()),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: Colors.grey.shade100,
-                        child: const Icon(Icons.broken_image_outlined, size: 50, color: Colors.grey),
-                      ),
-                    ),
+                    child: kIsWeb
+                        ? Image.network(
+                            product.imageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Container(
+                                color: Colors.grey.shade100,
+                                child: const Center(child: CircularProgressIndicator()),
+                              );
+                            },
+                            errorBuilder: (context, error, stack) => Container(
+                              color: Colors.grey.shade100,
+                              child: const Icon(Icons.broken_image_outlined, size: 50, color: Colors.grey),
+                            ),
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: product.imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey.shade100,
+                              child: const Center(child: CircularProgressIndicator()),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: Colors.grey.shade100,
+                              child: const Icon(Icons.broken_image_outlined, size: 50, color: Colors.grey),
+                            ),
+                          ),
                   ),
                   // Gradient shadow at bottom of image
                   Positioned(
@@ -403,6 +435,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       ),
                     ),
                   ],
+
+                  // ===== REVIEWS SECTION =====
+                  const SizedBox(height: 28),
+                  const Divider(color: AppTheme.cardBorder),
+                  const SizedBox(height: 16),
+                  _ReviewsSection(product: product),
                 ],
               ),
             ),
@@ -515,5 +553,267 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
       ),
     );
+  }
+}
+
+// ===================== REVIEWS SECTION =====================
+
+class _ReviewsSection extends StatefulWidget {
+  final ProductModel product;
+  const _ReviewsSection({required this.product});
+
+  @override
+  State<_ReviewsSection> createState() => _ReviewsSectionState();
+}
+
+class _ReviewsSectionState extends State<_ReviewsSection> {
+  double _selectedRating = 5.0;
+  final _commentController = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _showWriteReviewSheet(BuildContext context) {
+    final auth = context.read<AuthProvider>();
+    if (auth.isGuest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to write a review'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Write a Review',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text('Your Rating',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                const SizedBox(height: 8),
+                Row(
+                  children: List.generate(5, (i) {
+                    return GestureDetector(
+                      onTap: () => setModalState(() => _selectedRating = i + 1.0),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Icon(
+                          _selectedRating >= i + 1 ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: AppTheme.starGold,
+                          size: 34,
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _commentController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Your Review',
+                    hintText: 'Share your thoughts about this product...',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Consumer<ReviewProvider>(
+                  builder: (ctx, reviewProvider, _) => SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: reviewProvider.isSubmitting
+                          ? null
+                          : () async {
+                              if (_commentController.text.trim().isEmpty) return;
+                              final success = await reviewProvider.submitReview(
+                                productId: widget.product.id,
+                                userId: auth.userId,
+                                userName: auth.displayName,
+                                rating: _selectedRating,
+                                comment: _commentController.text.trim(),
+                              );
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                _commentController.clear();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(success
+                                        ? 'Review submitted! ⭐'
+                                        : 'You have already reviewed this product.'),
+                                    backgroundColor: success ? AppTheme.success : AppTheme.error,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                      child: reviewProvider.isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : const Text('Submit Review'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reviews = context.watch<ReviewProvider>().getReviews(widget.product.id);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Customer Reviews',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                Text('${reviews.length} review${reviews.length == 1 ? '' : 's'}',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+              ],
+            ),
+            ElevatedButton.icon(
+              onPressed: () => _showWriteReviewSheet(context),
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Write Review'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                textStyle: const TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (reviews.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.cardBorder),
+            ),
+            child: const Center(
+              child: Column(
+                children: [
+                  Icon(Icons.rate_review_outlined, size: 36, color: AppTheme.textMuted),
+                  SizedBox(height: 8),
+                  Text('No reviews yet. Be the first!',
+                      style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                ],
+              ),
+            ),
+          )
+        else
+          ...reviews.map((review) => _ReviewCard(review: review)),
+      ],
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  final ReviewModel review;
+  const _ReviewCard({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppTheme.primaryColor.withOpacity(0.12),
+                child: Text(
+                  review.userName.isNotEmpty ? review.userName[0].toUpperCase() : 'A',
+                  style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(review.userName,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppTheme.textPrimary)),
+                    Row(
+                      children: [
+                        ...List.generate(5, (i) => Icon(
+                          i < review.rating.round() ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: AppTheme.starGold,
+                          size: 14,
+                        )),
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatDate(review.createdAt),
+                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (review.comment.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(review.comment,
+                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.5)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
   }
 }

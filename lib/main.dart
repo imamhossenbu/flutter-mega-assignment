@@ -1,4 +1,4 @@
-import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_core/firebase_core.dart' show Firebase;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,8 +6,11 @@ import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
+import 'providers/order_provider.dart';
 import 'providers/product_provider.dart';
+import 'providers/review_provider.dart';
 import 'providers/wishlist_provider.dart';
+import 'services/firebase_service.dart';
 import 'views/main_navigation_screen.dart';
 
 Future<void> main() async {
@@ -20,6 +23,11 @@ Future<void> main() async {
   } catch (e) {
     debugPrint('Firebase initialization notice: $e');
   }
+
+  // Seed promo codes to Firestore (only if not already seeded)
+  try {
+    FirebaseService.instance.seedPromoCodes();
+  } catch (_) {}
 
   runApp(const MyApp());
 }
@@ -35,6 +43,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
+        ChangeNotifierProvider(create: (_) => OrderProvider()),
+        ChangeNotifierProvider(create: (_) => ReviewProvider()),
       ],
       child: MaterialApp(
         title: 'MegaStore - Firebase E-Commerce',

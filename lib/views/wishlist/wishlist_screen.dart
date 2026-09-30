@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -80,16 +81,38 @@ class WishlistScreen extends StatelessWidget {
                             // Product Image
                             ClipRRect(
                               borderRadius: BorderRadius.circular(14),
-                              child: CachedNetworkImage(
-                                imageUrl: product.imageUrl,
+                              child: SizedBox(
                                 width: 90,
                                 height: 90,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: Colors.grey.shade100,
-                                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                ),
-                                errorWidget: (context, url, error) => const Icon(Icons.image_not_supported_outlined),
+                                child: kIsWeb
+                                    ? Image.network(
+                                        product.imageUrl,
+                                        width: 90,
+                                        height: 90,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, progress) {
+                                          if (progress == null) return child;
+                                          return Container(
+                                            color: Colors.grey.shade100,
+                                            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stack) => Container(
+                                          color: Colors.grey.shade100,
+                                          child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
+                                        ),
+                                      )
+                                    : CachedNetworkImage(
+                                        imageUrl: product.imageUrl,
+                                        width: 90,
+                                        height: 90,
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => Container(
+                                          color: Colors.grey.shade100,
+                                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                        ),
+                                        errorWidget: (context, url, error) => const Icon(Icons.image_not_supported_outlined),
+                                      ),
                               ),
                             ),
                             const SizedBox(width: 14),

@@ -3,32 +3,40 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/order_provider.dart';
 import '../providers/wishlist_provider.dart';
 import 'cart/cart_screen.dart';
 import 'home/home_screen.dart';
+import 'orders/orders_screen.dart';
 import 'profile/profile_screen.dart';
 import 'wishlist/wishlist_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+  final int initialIndex;
+  const MainNavigationScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
 
   @override
   void initState() {
     super.initState();
-    // Update user ID in cart & wishlist providers once auth state is available
+    _currentIndex = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
       final userId = auth.userId;
-      context.read<CartProvider>().updateUserId(userId);
-      context.read<WishlistProvider>().updateUserId(userId);
+      _syncProviders(userId);
     });
+  }
+
+  void _syncProviders(String userId) {
+    context.read<CartProvider>().updateUserId(userId);
+    context.read<WishlistProvider>().updateUserId(userId);
+    context.read<OrderProvider>().updateUserId(userId);
   }
 
   void _navigateToTab(int index) {
@@ -38,10 +46,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    // Synchronize userId when auth changes
     final userId = auth.userId;
-    context.read<CartProvider>().updateUserId(userId);
-    context.read<WishlistProvider>().updateUserId(userId);
+    // Sync providers on next frame (not during build)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncProviders(userId);
+    });
 
     final cartQuantity = context.watch<CartProvider>().totalQuantity;
     final wishlistCount = context.watch<WishlistProvider>().count;
@@ -50,6 +60,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       const HomeScreen(),
       WishlistScreen(onExploreTap: () => _navigateToTab(0)),
       CartScreen(onExploreTap: () => _navigateToTab(0)),
+      const OrdersScreen(),
       const ProfileScreen(),
     ];
 
@@ -113,6 +124,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 child: const Icon(Icons.shopping_cart_rounded, color: AppTheme.primaryColor),
               ),
               label: 'Cart',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.receipt_long_outlined),
+              selectedIcon: Icon(Icons.receipt_long_rounded, color: AppTheme.primaryColor),
+              label: 'Orders',
             ),
             const NavigationDestination(
               icon: Icon(Icons.person_outline_rounded),
