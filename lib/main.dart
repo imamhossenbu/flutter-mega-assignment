@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'providers/admin_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/order_provider.dart';
@@ -43,8 +44,9 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
-        ChangeNotifierProvider(create: (_) => OrderProvider()),
+        ChangeNotifierProvider(create: (_) => OrderProvider()..initAdminOrdersStream()),
         ChangeNotifierProvider(create: (_) => ReviewProvider()),
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
       child: MaterialApp(
         title: 'MegaStore - Firebase E-Commerce',

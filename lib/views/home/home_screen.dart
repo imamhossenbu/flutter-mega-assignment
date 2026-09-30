@@ -1,19 +1,24 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../../providers/product_provider.dart';
+import '../admin/admin_main_screen.dart';
 import '../all_products/all_products_screen.dart';
-import '../details/product_details_screen.dart';
+import '../auth/login_screen.dart';
+import '../cart/cart_screen.dart';
+import '../dashboard/customer_dashboard_screen.dart';
 import 'widgets/banner_slider.dart';
 import 'widgets/category_chips.dart';
 import 'widgets/filter_bottom_sheet.dart';
 import 'widgets/product_card.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final VoidCallback? onCartTap;
+  final VoidCallback? onProfileTap;
+  const HomeScreen({super.key, this.onCartTap, this.onProfileTap});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -84,21 +89,112 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ],
                           ),
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppTheme.cardBorder, width: 1.5),
-                            ),
-                            child: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                              child: auth.isAuthenticated
-                                  ? Text(
-                                      auth.displayName[0].toUpperCase(),
-                                      style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
-                                    )
-                                  : const Icon(Icons.person_outline_rounded, color: AppTheme.primaryColor),
-                            ),
+                          Row(
+                            children: [
+                              // 1. If not authenticated: show Cart & Sign In button (NO profile avatar)
+                              if (!auth.isAuthenticated) ...[
+                                IconButton(
+                                  onPressed: widget.onCartTap ??
+                                      () => Navigator.of(context).push(
+                                            MaterialPageRoute(builder: (_) => const CartScreen()),
+                                          ),
+                                  icon: Badge(
+                                    isLabelVisible: context.watch<CartProvider>().totalQuantity > 0,
+                                    label: Text('${context.watch<CartProvider>().totalQuantity}'),
+                                    backgroundColor: AppTheme.primaryColor,
+                                    child: const Icon(Icons.shopping_bag_outlined, color: AppTheme.textPrimary, size: 24),
+                                  ),
+                                  tooltip: 'Cart',
+                                ),
+                                const SizedBox(width: 4),
+                                ElevatedButton.icon(
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                  ),
+                                  icon: const Icon(Icons.login_rounded, size: 16),
+                                  label: const Text('Sign In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    visualDensity: VisualDensity.compact,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ] else ...[
+                                // 2. If authenticated: show Admin button (if admin) + Cart icon + Profile Avatar
+                                if (auth.isAdmin) ...[
+                                  InkWell(
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(builder: (_) => const AdminMainScreen()),
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0F172A),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.4)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Icon(Icons.admin_panel_settings_rounded, size: 14, color: AppTheme.primaryLight),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'ADMIN',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.white,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                IconButton(
+                                  onPressed: widget.onCartTap ??
+                                      () => Navigator.of(context).push(
+                                            MaterialPageRoute(builder: (_) => const CartScreen()),
+                                          ),
+                                  icon: Badge(
+                                    isLabelVisible: context.watch<CartProvider>().totalQuantity > 0,
+                                    label: Text('${context.watch<CartProvider>().totalQuantity}'),
+                                    backgroundColor: AppTheme.primaryColor,
+                                    child: const Icon(Icons.shopping_bag_outlined, color: AppTheme.textPrimary, size: 24),
+                                  ),
+                                  tooltip: 'Cart',
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: widget.onProfileTap ??
+                                      () => Navigator.of(context).push(
+                                            MaterialPageRoute(builder: (_) => const CustomerDashboardScreen()),
+                                          ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppTheme.primaryColor.withOpacity(0.4), width: 1.5),
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 18,
+                                      backgroundColor: AppTheme.primaryColor.withOpacity(0.12),
+                                      child: Text(
+                                        auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
+                                        style: const TextStyle(
+                                          color: AppTheme.primaryColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ],
                       ),
@@ -254,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     sliver: SliverGrid(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2, childAspectRatio: 0.55, crossAxisSpacing: 12, mainAxisSpacing: 14,
+                        crossAxisCount: 2, childAspectRatio: 0.60, crossAxisSpacing: 12, mainAxisSpacing: 14,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) => ProductCard(product: filteredProducts[index]),
@@ -296,13 +392,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 230,
+                      height: 285,
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         scrollDirection: Axis.horizontal,
                         itemCount: featuredProducts.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (context, index) => _HorizontalProductCard(product: featuredProducts[index]),
+                        itemBuilder: (context, index) => ProductCard(product: featuredProducts[index], width: 175),
                       ),
                     ),
                   ),
@@ -325,13 +421,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 230,
+                      height: 285,
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         scrollDirection: Axis.horizontal,
                         itemCount: topRated.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (context, index) => _HorizontalProductCard(product: topRated[index]),
+                        itemBuilder: (context, index) => ProductCard(product: topRated[index], width: 175),
                       ),
                     ),
                   ),
@@ -354,13 +450,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 230,
+                      height: 285,
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         scrollDirection: Axis.horizontal,
                         itemCount: deals.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 12),
-                        itemBuilder: (context, index) => _HorizontalProductCard(product: deals[index], showDiscount: true),
+                        itemBuilder: (context, index) => ProductCard(product: deals[index], width: 175, showDiscount: true),
                       ),
                     ),
                   ),
@@ -391,7 +487,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     sliver: SliverGrid(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2, childAspectRatio: 0.55, crossAxisSpacing: 12, mainAxisSpacing: 14,
+                        crossAxisCount: 2, childAspectRatio: 0.60, crossAxisSpacing: 12, mainAxisSpacing: 14,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -513,102 +609,6 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ===== Horizontal Product Card =====
-class _HorizontalProductCard extends StatelessWidget {
-  final ProductModel product;
-  final bool showDiscount;
-
-  const _HorizontalProductCard({required this.product, this.showDiscount = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ProductDetailsScreen(product: product)),
-      ),
-      child: Container(
-        width: 150,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.cardBorder),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                  child: SizedBox(
-                    width: 150,
-                    height: 140,
-                    child: kIsWeb
-                        ? Image.network(product.imageUrl, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: Colors.grey.shade100,
-                              child: const Icon(Icons.image_outlined, color: Colors.grey, size: 32),
-                            ))
-                        : Image.network(product.imageUrl, fit: BoxFit.cover),
-                  ),
-                ),
-                if (showDiscount && product.discountPercent > 0)
-                  Positioned(
-                    top: 6, left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(color: AppTheme.accentColor, borderRadius: BorderRadius.circular(6)),
-                      child: Text('-${product.discountPercent.toInt()}%',
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                if (!showDiscount && product.rating >= 4.5)
-                  Positioned(
-                    top: 6, right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(6)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star_rounded, color: AppTheme.starGold, size: 11),
-                          const SizedBox(width: 2),
-                          Text(product.rating.toStringAsFixed(1),
-                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            // Info
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(product.brand.toUpperCase(),
-                        style: const TextStyle(fontSize: 9, color: AppTheme.primaryColor, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
-                    const SizedBox(height: 3),
-                    Text(product.name,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const Spacer(),
-                    Text('\$${product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -20,21 +20,22 @@ class OrdersScreen extends StatelessWidget {
         backgroundColor: AppTheme.background,
         appBar: AppBar(title: const Text('My Orders')),
         body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 90,
-                  height: 90,
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     color: Colors.indigo.shade50,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.lock_outline_rounded, size: 44, color: AppTheme.primaryColor),
+                  child: const Icon(Icons.lock_outline_rounded, size: 40, color: AppTheme.primaryColor),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
                 const Text(
                   'Sign In to View Orders',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
@@ -45,7 +46,7 @@ class OrdersScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 ElevatedButton.icon(
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -94,24 +95,28 @@ class OrdersScreen extends StatelessWidget {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 90,
-            height: 90,
-            decoration: BoxDecoration(color: Colors.indigo.shade50, shape: BoxShape.circle),
-            child: const Icon(Icons.receipt_long_outlined, size: 44, color: AppTheme.primaryColor),
-          ),
-          const SizedBox(height: 20),
-          const Text('No Orders Yet',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
-          const SizedBox(height: 8),
-          const Text(
-            'Your placed orders will appear here.',
-            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-          ),
-        ],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(color: Colors.indigo.shade50, shape: BoxShape.circle),
+              child: const Icon(Icons.receipt_long_outlined, size: 40, color: AppTheme.primaryColor),
+            ),
+            const SizedBox(height: 16),
+            const Text('No Orders Yet',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+            const SizedBox(height: 8),
+            const Text(
+              'Your placed orders will appear here.',
+              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -213,8 +218,15 @@ class _OrderCard extends StatelessWidget {
                             Text(item.productName,
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                 maxLines: 1, overflow: TextOverflow.ellipsis),
-                            Text('${item.productBrand} • Qty: ${item.quantity}',
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                            Text(
+                              [
+                                if (item.productBrand.isNotEmpty) item.productBrand,
+                                if (item.selectedSize != null) 'Size: ${item.selectedSize}',
+                                if (item.selectedColor != null) 'Color: ${item.selectedColor}',
+                                'Qty: ${item.quantity}',
+                              ].join(' • '),
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
                           ],
                         ),
                       ),

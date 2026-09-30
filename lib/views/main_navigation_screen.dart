@@ -6,9 +6,9 @@ import '../providers/cart_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/wishlist_provider.dart';
 import 'cart/cart_screen.dart';
+import 'dashboard/customer_dashboard_screen.dart';
 import 'home/home_screen.dart';
 import 'orders/orders_screen.dart';
-import 'profile/profile_screen.dart';
 import 'wishlist/wishlist_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -57,11 +57,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final wishlistCount = context.watch<WishlistProvider>().count;
 
     final pages = [
-      const HomeScreen(),
+      HomeScreen(
+        onCartTap: () => _navigateToTab(2),
+        onProfileTap: () => _navigateToTab(4),
+      ),
       WishlistScreen(onExploreTap: () => _navigateToTab(0)),
       CartScreen(onExploreTap: () => _navigateToTab(0)),
       const OrdersScreen(),
-      const ProfileScreen(),
+      CustomerDashboardScreen(
+        onExploreTap: () => _navigateToTab(0),
+        onWishlistTap: () => _navigateToTab(1),
+        onCartTap: () => _navigateToTab(2),
+      ),
     ];
 
     return Scaffold(
@@ -131,9 +138,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               label: 'Orders',
             ),
             const NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded, color: AppTheme.primaryColor),
-              label: 'Account',
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard_rounded, color: AppTheme.primaryColor),
+              label: 'Dashboard',
             ),
           ],
         ),

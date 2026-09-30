@@ -3,20 +3,13 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
-import '../../providers/product_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../auth/login_screen.dart';
 import '../orders/orders_screen.dart';
+import 'widgets/profile_management_dialogs.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
-
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isReseeding = false;
 
   @override
   Widget build(BuildContext context) {
@@ -33,24 +26,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: AppTheme.background,
       appBar: AppBar(title: const Text('Account')),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 100,
-                height: 100,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.person_outline_rounded, size: 52, color: AppTheme.primaryColor),
+                child: const Icon(Icons.person_outline_rounded, size: 44, color: AppTheme.primaryColor),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               const Text(
                 'Join MegaStore',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -58,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -90,7 +84,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildAuthenticatedView(BuildContext context, AuthProvider auth) {
     final cartProvider = context.watch<CartProvider>();
     final wishlistProvider = context.watch<WishlistProvider>();
-    final productProvider = context.read<ProductProvider>();
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -99,7 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            onPressed: () => _showEditProfileDialog(context, auth),
+            onPressed: () => ProfileManagementDialogs.showEditProfileDialog(context, auth),
           ),
         ],
       ),
@@ -219,44 +212,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   label: 'Edit Profile',
                   subtitle: 'Name, email, phone number',
                   color: Colors.blue,
-                  onTap: () => _showEditProfileDialog(context, auth),
+                  onTap: () => ProfileManagementDialogs.showEditProfileDialog(context, auth),
                 ),
                 _MenuItem(
                   icon: Icons.lock_outline_rounded,
                   label: 'Change Password',
                   subtitle: 'Update your password',
                   color: Colors.orange,
-                  onTap: () => _showChangePasswordDialog(context, auth),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            _buildMenuSection(
-              title: 'App',
-              items: [
-                _MenuItem(
-                  icon: Icons.cloud_sync_rounded,
-                  label: 'Re-seed Demo Products',
-                  subtitle: 'Restore products to Firestore',
-                  color: Colors.teal,
-                  trailing: _isReseeding
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : null,
-                  onTap: _isReseeding
-                      ? null
-                      : () async {
-                          setState(() => _isReseeding = true);
-                          await productProvider.reseedSampleProducts();
-                          if (!mounted) return;
-                          setState(() => _isReseeding = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Products seeded to Firestore! 🚀'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
+                  onTap: () => ProfileManagementDialogs.showChangePasswordDialog(context, auth),
                 ),
               ],
             ),
@@ -375,7 +338,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   title: Text(item.label,
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                   subtitle: Text(item.subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
-                  trailing: item.trailing ?? const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
                 ),
                 if (!isLast) const Divider(height: 0, indent: 68),
               ],
@@ -383,168 +346,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           }),
         ],
       ),
-    );
-  }
-
-  void _showEditProfileDialog(BuildContext context, AuthProvider auth) {
-    final nameController = TextEditingController(text: auth.displayName);
-    final phoneController = TextEditingController(text: auth.phone);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Edit Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline_rounded)),
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_outlined)),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    await auth.updateProfile(
-                      name: nameController.text.trim(),
-                      phone: phoneController.text.trim(),
-                    );
-                    if (ctx.mounted) {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Profile updated!'), behavior: SnackBarBehavior.floating),
-                      );
-                    }
-                  },
-                  child: const Text('Save Changes'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showChangePasswordDialog(BuildContext context, AuthProvider auth) {
-    final newPasswordController = TextEditingController();
-    final confirmController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    bool obscure1 = true;
-    bool obscure2 = true;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setModalState) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Change Password', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: newPasswordController,
-                    obscureText: obscure1,
-                    decoration: InputDecoration(
-                      labelText: 'New Password',
-                      prefixIcon: const Icon(Icons.lock_outline_rounded),
-                      suffixIcon: IconButton(
-                        icon: Icon(obscure1 ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                        onPressed: () => setModalState(() => obscure1 = !obscure1),
-                      ),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Required';
-                      if (v.length < 6) return 'At least 6 characters';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: confirmController,
-                    obscureText: obscure2,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm New Password',
-                      prefixIcon: const Icon(Icons.lock_outline_rounded),
-                      suffixIcon: IconButton(
-                        icon: Icon(obscure2 ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                        onPressed: () => setModalState(() => obscure2 = !obscure2),
-                      ),
-                    ),
-                    validator: (v) {
-                      if (v != newPasswordController.text) return 'Passwords do not match';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (!formKey.currentState!.validate()) return;
-                        final success = await auth.changePassword(newPasswordController.text);
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(success ? 'Password changed successfully!' : auth.errorMessage ?? 'Failed'),
-                              backgroundColor: success ? AppTheme.success : AppTheme.error,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text('Update Password'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }),
     );
   }
 }
@@ -555,7 +356,6 @@ class _MenuItem {
   final String subtitle;
   final Color color;
   final VoidCallback? onTap;
-  final Widget? trailing;
 
   const _MenuItem({
     required this.icon,
@@ -563,6 +363,5 @@ class _MenuItem {
     required this.subtitle,
     required this.color,
     required this.onTap,
-    this.trailing,
   });
 }

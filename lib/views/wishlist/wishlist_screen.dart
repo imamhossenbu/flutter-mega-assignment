@@ -233,25 +233,26 @@ class WishlistScreen extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 90,
-              height: 90,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                 color: Colors.pink.shade50,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.favorite_outline_rounded,
-                size: 44,
+                size: 40,
                 color: AppTheme.accentColor,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             const Text(
               'Your Wishlist is Empty',
               style: TextStyle(
@@ -269,7 +270,7 @@ class WishlistScreen extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             if (onExploreTap != null)
               ElevatedButton.icon(
                 onPressed: onExploreTap,

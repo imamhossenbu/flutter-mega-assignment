@@ -36,4 +36,20 @@ class PromoCodeModel {
             : null,
         description: map['description'] as String? ?? '',
       );
+
+  PromoCodeModel copyWith({
+    String? code,
+    double? discountPercent,
+    bool? isActive,
+    DateTime? expiresAt,
+    String? description,
+  }) {
+    return PromoCodeModel(
+      code: code ?? this.code,
+      discountPercent: discountPercent ?? this.discountPercent,
+      isActive: isActive ?? this.isActive,
+      expiresAt: expiresAt ?? this.expiresAt,
+      description: description ?? this.description,
+    );
+  }
 }

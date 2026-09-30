@@ -21,6 +21,21 @@ class AuthProvider extends ChangeNotifier {
   String get email => _user?.email ?? '';
   String get photoUrl => _profile?['photoUrl'] as String? ?? _user?.photoURL ?? '';
   String get phone => _profile?['phone'] as String? ?? '';
+  String get role => _profile?['role'] as String? ?? (_isAdminMode ? 'admin' : 'customer');
+
+  bool _isAdminMode = false;
+  bool get isAdminMode => _isAdminMode;
+  bool get isAdmin => role == 'admin' || _isAdminMode;
+
+  void toggleAdminMode() {
+    _isAdminMode = !_isAdminMode;
+    notifyListeners();
+  }
+
+  void setAdminMode(bool enabled) {
+    _isAdminMode = enabled;
+    notifyListeners();
+  }
 
   bool get isLoading => _status == AuthStatus.loading;
   bool get isAuthenticated => _status == AuthStatus.authenticated && _user != null && _user!.email != null;
@@ -84,6 +99,35 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> signInWithGoogle() async {
+    _errorMessage = null;
+    _status = AuthStatus.loading;
+    notifyListeners();
+    try {
+      final user = await FirebaseService.instance.signInWithGoogle();
+      if (user == null) {
+        _status = _user != null && !_user!.isAnonymous ? AuthStatus.authenticated : AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
+      _user = user;
+      _status = AuthStatus.authenticated;
+      await _loadProfile(user.uid);
+      notifyListeners();
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _errorMessage = _mapAuthError(e.code);
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Google sign-in failed. Please try again.';
+      _status = AuthStatus.unauthenticated;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> signUp(String email, String password, String name) async {
     _errorMessage = null;
     _status = AuthStatus.loading;
@@ -107,6 +151,7 @@ class AuthProvider extends ChangeNotifier {
     await FirebaseService.instance.signOut();
     _user = null;
     _profile = null;
+    _isAdminMode = false;
     _status = AuthStatus.unauthenticated;
     // Re-sign in anonymously for Firestore read access
     final anonUser = await FirebaseService.instance.ensureAuthenticated();
@@ -118,7 +163,10 @@ class AuthProvider extends ChangeNotifier {
     if (userId.isEmpty) return false;
     try {
       await FirebaseService.instance.updateUserProfile(userId, name: name, phone: phone);
-      _profile = {...?_profile, if (name != null) 'name': name, if (phone != null) 'phone': phone};
+      final updated = Map<String, dynamic>.from(_profile ?? {});
+      if (name != null) updated['name'] = name;
+      if (phone != null) updated['phone'] = phone;
+      _profile = updated;
       notifyListeners();
       return true;
     } catch (e) {
@@ -126,12 +174,29 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> changePassword(String newPassword) async {
+  Future<bool> setRole(String targetUserId, String newRole) async {
     try {
-      await FirebaseService.instance.changePassword(newPassword);
+      await FirebaseService.instance.setUserRole(targetUserId, newRole);
+      if (targetUserId == userId) {
+        _profile = {...?_profile, 'role': newRole};
+        notifyListeners();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> changePassword(String newPassword, {String? currentPassword}) async {
+    try {
+      await FirebaseService.instance.changePassword(newPassword, currentPassword: currentPassword);
       return true;
     } on FirebaseAuthException catch (e) {
       _errorMessage = _mapAuthError(e.code);
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Could not update password. Please check your credentials.';
       notifyListeners();
       return false;
     }
@@ -145,11 +210,11 @@ class AuthProvider extends ChangeNotifier {
   String _mapAuthError(String code) {
     switch (code) {
       case 'user-not-found':
-        return 'No account found with this email.';
+        return 'No account found with this email. Please tap "Create Account" below to register.';
       case 'wrong-password':
-        return 'Incorrect password. Please try again.';
+        return 'Incorrect password. Please verify and try again.';
       case 'email-already-in-use':
-        return 'An account already exists with this email.';
+        return 'An account already exists with this email. Please sign in instead.';
       case 'invalid-email':
         return 'Please enter a valid email address.';
       case 'weak-password':
@@ -159,9 +224,9 @@ class AuthProvider extends ChangeNotifier {
       case 'requires-recent-login':
         return 'Please sign out and sign in again to change your password.';
       case 'invalid-credential':
-        return 'Invalid email or password.';
+        return 'Incorrect email or password. If you do not have an account yet, please tap "Create Account" below.';
       default:
-        return 'An error occurred. Please try again.';
+        return 'An error occurred. Please check your credentials and try again.';
     }
   }
 }

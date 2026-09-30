@@ -530,25 +530,26 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 90,
-              height: 90,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                 color: Colors.indigo.shade50,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.shopping_cart_outlined,
-                size: 44,
+                size: 40,
                 color: AppTheme.primaryColor,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             const Text(
               'Your Cart is Empty',
               style: TextStyle(
@@ -566,7 +567,7 @@ class _CartScreenState extends State<CartScreen> {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             if (widget.onExploreTap != null)
               ElevatedButton.icon(
                 onPressed: widget.onExploreTap,

@@ -8,18 +8,63 @@ import '../services/firebase_service.dart';
 class OrderProvider extends ChangeNotifier {
   String _userId = '';
   List<OrderModel> _orders = [];
+  List<OrderModel> _allOrders = [];
   bool _isLoading = false;
   bool _isPlacingOrder = false;
   StreamSubscription? _subscription;
+  StreamSubscription? _allOrdersSub;
 
   List<OrderModel> get orders => _orders;
+  List<OrderModel> get allOrders => _allOrders;
   bool get isLoading => _isLoading;
   bool get isPlacingOrder => _isPlacingOrder;
+
+  // Customer metrics
+  double get totalSpent => _orders.fold(0.0, (sum, o) => sum + o.grandTotal);
+  int get ordersCount => _orders.length;
+  int get activeOrdersCount => _orders
+      .where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled)
+      .length;
+  OrderModel? get latestActiveOrder {
+    try {
+      return _orders.firstWhere(
+        (o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled,
+      );
+    } catch (_) {
+      return _orders.isNotEmpty ? _orders.first : null;
+    }
+  }
+
+  // Admin metrics
+  double get totalRevenue => _allOrders.fold(
+      0.0, (sum, o) => sum + (o.status != OrderStatus.cancelled ? o.grandTotal : 0.0));
+  int get totalOrdersCount => _allOrders.length;
+  int get pendingOrdersCount =>
+      _allOrders.where((o) => o.status == OrderStatus.pending || o.status == OrderStatus.confirmed).length;
+  int get shippedOrdersCount => _allOrders.where((o) => o.status == OrderStatus.shipped).length;
+  int get deliveredOrdersCount => _allOrders.where((o) => o.status == OrderStatus.delivered).length;
 
   void updateUserId(String newUserId) {
     if (_userId == newUserId) return;
     _userId = newUserId;
     _listenToOrders();
+  }
+
+  void initAdminOrdersStream() {
+    _allOrdersSub?.cancel();
+    try {
+      _allOrdersSub = FirebaseService.instance.streamAllOrders().listen(
+        (orders) {
+          _allOrders = orders;
+          notifyListeners();
+        },
+        onError: (e) {
+          debugPrint('Admin orders stream error: $e');
+        },
+      );
+    } catch (e) {
+      debugPrint('Admin orders stream listen error: $e');
+    }
   }
 
   void _listenToOrders() {
@@ -43,6 +88,16 @@ class OrderProvider extends ChangeNotifier {
     } catch (e) {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> updateOrderStatus(String orderId, String userId, OrderStatus newStatus) async {
+    try {
+      await FirebaseService.instance.updateOrderStatus(orderId, userId, newStatus);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating order status: $e');
+      return false;
     }
   }
 
@@ -106,6 +161,7 @@ class OrderProvider extends ChangeNotifier {
   @override
   void dispose() {
     _subscription?.cancel();
+    _allOrdersSub?.cancel();
     super.dispose();
   }
 }

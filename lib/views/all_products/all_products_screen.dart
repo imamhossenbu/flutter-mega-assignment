@@ -1,10 +1,9 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/product_model.dart';
 import '../../providers/product_provider.dart';
-import '../details/product_details_screen.dart';
+import '../home/widgets/product_card.dart';
 
 class AllProductsScreen extends StatefulWidget {
   final String title;
@@ -80,97 +79,16 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 0.58,
+                childAspectRatio: 0.60,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 14,
               ),
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final product = filtered[index];
-                return _ProductTile(product: product);
+                return ProductCard(product: product);
               },
             ),
-    );
-  }
-}
-
-class _ProductTile extends StatelessWidget {
-  final ProductModel product;
-  const _ProductTile({required this.product});
-
-  @override
-  Widget build(BuildContext context) {
-    final discountPercent = product.discountPercent.toInt();
-
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ProductDetailsScreen(product: product)),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppTheme.cardBorder),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 140,
-                    child: kIsWeb
-                        ? Image.network(product.imageUrl, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: Colors.grey.shade100,
-                              child: const Icon(Icons.image_outlined, color: Colors.grey, size: 40),
-                            ))
-                        : Image.network(product.imageUrl, fit: BoxFit.cover),
-                  ),
-                ),
-                if (discountPercent > 0)
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text('-$discountPercent%',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-              ],
-            ),
-            // Info
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(product.brand.toUpperCase(),
-                        style: const TextStyle(fontSize: 10, color: AppTheme.primaryColor, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-                    const SizedBox(height: 4),
-                    Text(product.name,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-                        maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const Spacer(),
-                    Text('\$${product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

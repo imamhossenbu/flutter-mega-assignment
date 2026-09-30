@@ -151,8 +151,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Email is required';
-                        if (!v.contains('@')) return 'Enter a valid email';
+                        if (v == null || v.trim().isEmpty) return 'Email is required';
+                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                        if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email address';
                         return null;
                       },
                     ),
@@ -198,10 +199,10 @@ class _SignupScreenState extends State<SignupScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
-                      height: 54,
+                      height: 52,
                       child: ElevatedButton(
                         onPressed: auth.isLoading ? null : _signUp,
                         child: auth.isLoading

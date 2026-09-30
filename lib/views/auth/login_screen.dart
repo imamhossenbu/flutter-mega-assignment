@@ -109,9 +109,32 @@ class _LoginScreenState extends State<LoginScreen> {
                       const Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          auth.errorMessage!,
-                          style: const TextStyle(color: AppTheme.error, fontSize: 13),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              auth.errorMessage!,
+                              style: const TextStyle(color: AppTheme.error, fontSize: 13, height: 1.3),
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () {
+                                auth.clearError();
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(builder: (_) => const SignupScreen()),
+                                );
+                              },
+                              child: const Text(
+                                '👉 Need an account? Tap here to Register',
+                                style: TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -134,8 +157,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Email is required';
-                        if (!v.contains('@')) return 'Enter a valid email';
+                        if (v == null || v.trim().isEmpty) return 'Email is required';
+                        final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                        if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email address';
                         return null;
                       },
                     ),
@@ -160,12 +184,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 24),
 
                     // Sign In Button
                     SizedBox(
                       width: double.infinity,
-                      height: 54,
+                      height: 52,
                       child: ElevatedButton(
                         onPressed: auth.isLoading ? null : _signIn,
                         child: auth.isLoading
@@ -201,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // Sign Up Button
               SizedBox(
                 width: double.infinity,
-                height: 54,
+                height: 52,
                 child: OutlinedButton(
                   onPressed: () {
                     auth.clearError();

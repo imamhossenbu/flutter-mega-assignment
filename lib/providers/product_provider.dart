@@ -176,6 +176,61 @@ class ProductProvider extends ChangeNotifier {
     }
   }
 
+  List<String> get allCategories {
+    final set = <String>{'All', 'Electronics', 'Footwear', 'Audio', 'Watches', 'Fashion'};
+    for (final p in _allProducts) {
+      if (p.category.trim().isNotEmpty) {
+        set.add(p.category.trim());
+      }
+    }
+    return set.toList();
+  }
+
+  int get totalProductsCount => _allProducts.length;
+  int get inStockCount => _allProducts.where((p) => p.inStock && p.stockCount > 0).length;
+  int get lowStockCount => _allProducts.where((p) => p.stockCount > 0 && p.stockCount < 5).length;
+  int get outOfStockCount => _allProducts.where((p) => !p.inStock || p.stockCount <= 0).length;
+
+  Future<bool> addProduct(ProductModel product) async {
+    try {
+      await FirebaseService.instance.addProduct(product);
+      return true;
+    } catch (e) {
+      debugPrint('Error adding product: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateProduct(ProductModel product) async {
+    try {
+      await FirebaseService.instance.updateProduct(product);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating product: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteProduct(String productId) async {
+    try {
+      await FirebaseService.instance.deleteProduct(productId);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting product: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateStock(String productId, int newStock) async {
+    try {
+      await FirebaseService.instance.updateProductStock(productId, newStock);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating stock: $e');
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_mega_assignment/models/product_model.dart';
+import 'package:flutter_mega_assignment/models/promo_code_model.dart';
 import 'package:flutter_mega_assignment/models/cart_item_model.dart';
 import 'package:flutter_mega_assignment/models/filter_options.dart';
 import 'package:flutter_mega_assignment/core/constants/app_constants.dart';
@@ -76,6 +77,31 @@ void main() {
       final resetOptions = options.reset();
       expect(resetOptions.hasActiveFilters, false);
       expect(resetOptions.selectedCategory, 'All');
+    });
+  });
+
+  group('PromoCodeModel Tests', () {
+    test('Calculates isValid based on expiry and isActive', () {
+      final validPromo = PromoCodeModel(
+        code: 'SAVE20',
+        discountPercent: 0.20,
+        isActive: true,
+        description: '20% off',
+        expiresAt: DateTime.now().add(const Duration(days: 7)),
+      );
+      expect(validPromo.isValid, true);
+
+      final expiredPromo = PromoCodeModel(
+        code: 'EXPIRED10',
+        discountPercent: 0.10,
+        isActive: true,
+        description: 'Expired',
+        expiresAt: DateTime.now().subtract(const Duration(days: 1)),
+      );
+      expect(expiredPromo.isValid, false);
+
+      final inactivePromo = validPromo.copyWith(isActive: false);
+      expect(inactivePromo.isValid, false);
     });
   });
 }
