@@ -2,10 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../models/order_model.dart';
 import '../../providers/order_provider.dart';
+import '../../services/cloudinary_service.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
@@ -20,7 +22,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
   final List<_TabConfig> _tabs = [
     _TabConfig('All', Icons.grid_view_rounded, null),
     _TabConfig('Pending', Icons.hourglass_top_rounded, Colors.amber),
-    _TabConfig('Confirmed', Icons.check_circle_outline_rounded, Colors.blue),
+    _TabConfig('Processing', Icons.sync_rounded, Colors.blue),
     _TabConfig('Shipped', Icons.local_shipping_rounded, Colors.purple),
     _TabConfig('Delivered', Icons.verified_rounded, Colors.green),
     _TabConfig('Cancelled', Icons.cancel_outlined, Colors.red),
@@ -46,7 +48,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Order Fulfilment'),
+        title: const Text('Order Management'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Container(
@@ -104,7 +106,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Orders placed by customers will\nappear here in real-time.',
+                    'Customer orders will appear here in real-time.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
                   ),
@@ -114,7 +116,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             itemCount: filtered.length,
             itemBuilder: (context, index) {
               final order = filtered[index];
@@ -139,38 +141,45 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
             decoration: BoxDecoration(
               color: isSelected ? AppTheme.primaryColor : Colors.transparent,
               borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isSelected ? AppTheme.primaryColor : const Color(0xFFE2E8F0),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   tab.icon,
-                  size: 14,
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  size: 15,
+                  color: isSelected
+                      ? Colors.white
+                      : (tab.color ?? const Color(0xFF64748B)),
                 ),
-                const SizedBox(width: 5),
+                const SizedBox(width: 6),
                 Text(
                   tab.label,
                   style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? Colors.white : AppTheme.textSecondary,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.white : AppTheme.textPrimary,
                   ),
                 ),
                 if (count > 0) ...[
-                  const SizedBox(width: 5),
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white.withOpacity(0.25) : const Color(0xFFF1F5F9),
+                      color: isSelected
+                          ? Colors.white.withOpacity(0.25)
+                          : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       '$count',
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : AppTheme.textSecondary,
+                        color: isSelected ? Colors.white : const Color(0xFF64748B),
                       ),
                     ),
                   ),
@@ -184,15 +193,19 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
   }
 
   Widget _buildAdminOrderCard(BuildContext context, OrderModel order, OrderProvider provider) {
+    final orderCode =
+        order.id.length > 8 ? order.id.substring(0, 8).toUpperCase() : order.id.toUpperCase();
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
             offset: const Offset(0, 3),
           ),
         ],
@@ -200,7 +213,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order Header
+          // Header: Order ID + Date + Status Chip
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             child: Row(
@@ -209,27 +222,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '#${order.id.length > 8 ? order.id.substring(order.id.length - 8).toUpperCase() : order.id.toUpperCase()}',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.textPrimary,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'Order #$orderCode',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       _formatDate(order.createdAt),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
@@ -243,162 +245,187 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
 
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
 
-          // Order Items Preview
+          // Customer Details & Delivery Address
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ...order.items.take(3).map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 15, color: AppTheme.primaryColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      order.customerName.isNotEmpty ? order.customerName : 'Customer',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                    ),
+                    if (order.customerPhone.isNotEmpty) ...[
+                      const Text(' • ', style: TextStyle(color: AppTheme.textMuted)),
+                      const Icon(Icons.phone_outlined, size: 13, color: AppTheme.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        order.customerPhone,
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.location_on_outlined, size: 15, color: AppTheme.textMuted),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        order.shippingAddress.isNotEmpty ? order.shippingAddress : 'No address provided',
+                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.payments_outlined, size: 15, color: Color(0xFF059669)),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Payment: Cash on Delivery (COD)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF059669),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+          // Items Snapshot List
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ...order.items.map((item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          width: 48,
-                          height: 48,
+                          width: 44,
+                          height: 44,
                           color: const Color(0xFFF1F5F9),
                           child: kIsWeb
                               ? Image.network(
-                                  item.productImage,
+                                  item.imageUrl,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(Icons.image_outlined, size: 20, color: Color(0xFF94A3B8)),
+                                  errorBuilder: (_, _, _) => const Icon(
+                                    Icons.image_outlined,
+                                    size: 20,
+                                    color: Color(0xFF94A3B8),
+                                  ),
                                 )
                               : CachedNetworkImage(
-                                  imageUrl: item.productImage,
+                                  imageUrl: CloudinaryService.thumbnail(item.imageUrl),
                                   fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => const Icon(Icons.image_outlined, size: 20, color: Color(0xFF94A3B8)),
+                                  errorWidget: (_, _, _) => const Icon(
+                                    Icons.image_outlined,
+                                    size: 20,
+                                    color: Color(0xFF94A3B8),
+                                  ),
                                 ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              item.productName,
+                              item.name,
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
                             ),
-                            const SizedBox(height: 2),
                             Text(
-                              'Qty: ${item.quantity} × \$${item.unitPrice.toStringAsFixed(2)}'
-                              '${item.selectedColor != null ? ' · ${item.selectedColor}' : ''}'
-                              '${item.selectedSize != null ? ' · ${item.selectedSize}' : ''}',
-                              style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                              [
+                                if (item.selectedSize != null) 'Size: ${item.selectedSize}',
+                                if (item.selectedColor != null) 'Color: ${item.selectedColor}',
+                                'Qty: ${item.quantity}',
+                              ].join(' • '),
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
                             ),
                           ],
                         ),
                       ),
                       Text(
-                        '\$${item.totalPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                        AppConstants.formatCurrency(item.totalPrice),
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                 )),
-                if (order.items.length > 3)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Text(
-                      '+${order.items.length - 3} more items',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted, fontStyle: FontStyle.italic),
-                    ),
-                  ),
               ],
             ),
           ),
 
-          // Price + Shipping Summary Row
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.location_on_outlined, size: 14, color: AppTheme.textMuted),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    order.shippingAddress.isNotEmpty ? order.shippingAddress : 'No address provided',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Footer
+          // Summary & Status Transition Footer
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.receipt_long_outlined, size: 13, color: AppTheme.textMuted),
-                    const SizedBox(width: 4),
                     Text(
-                      '${order.items.length} item${order.items.length == 1 ? '' : 's'}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
-                    ),
-                    if (order.promoCode != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '🏷 ${order.promoCode}',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade700),
-                        ),
+                      'Total: ${AppConstants.formatCurrency(order.grandTotal)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: AppTheme.primaryColor,
                       ),
-                    ],
+                    ),
+                    Text(
+                      'Includes ${AppConstants.formatCurrency(order.deliveryCharge)} delivery',
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Text(
-                      '\$${order.grandTotal.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppTheme.primaryColor),
+                GestureDetector(
+                  onTap: () => _showStatusPickerModal(context, order, provider),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: () => _showStatusPickerModal(context, order, provider),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppTheme.primaryColor, Color(0xFF4338CA)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Update Status',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(color: AppTheme.primaryColor.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2)),
-                          ],
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.edit_road_rounded, size: 13, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text('Update', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white)),
-                          ],
-                        ),
-                      ),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 11, color: Colors.white),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -416,7 +443,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
         bg = Colors.amber.shade50;
         fg = Colors.amber.shade800;
         break;
-      case OrderStatus.confirmed:
+      case OrderStatus.processing:
         bg = Colors.blue.shade50;
         fg = Colors.blue.shade800;
         break;
@@ -457,6 +484,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
   }
 
   void _showStatusPickerModal(BuildContext context, OrderModel order, OrderProvider provider) {
+    final nextStatuses = order.status.allowedNextStatuses;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -468,7 +497,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,67 +506,110 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
                     child: Container(
                       width: 40,
                       height: 4,
-                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   const Text('Update Order Status', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(
-                    'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8).toUpperCase() : order.id.toUpperCase()}',
+                    'Current Status: ${order.status.emoji} ${order.status.label}',
                     style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
                   ),
                   const SizedBox(height: 16),
-                  ...OrderStatus.values.map((status) {
-                    final isCurrent = order.status == status;
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: InkWell(
-                        onTap: () async {
-                          Navigator.pop(ctx);
-                          final success = await provider.updateOrderStatus(order.id, order.userId, status);
-                          if (context.mounted) {
-                            if (success) {
-                              AppToast.showSuccess(
-                                context,
-                                'Order updated to ${status.label}!',
-                                title: 'Status Updated',
-                              );
-                            } else {
-                              AppToast.showError(context, 'Failed to update order status');
-                            }
-                          }
-                        },
+
+                  if (nextStatuses.isEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(12),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: isCurrent ? AppTheme.primaryColor.withOpacity(0.07) : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: AppTheme.textMuted, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'This order is ${order.status.label}. Status transitions are complete and cannot be modified.',
+                              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              Text(status.emoji, style: const TextStyle(fontSize: 20)),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  status.label,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                                    color: isCurrent ? AppTheme.primaryColor : AppTheme.textPrimary,
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Select Next Status (Enforces State Machine Flow):',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    ...nextStatuses.map((status) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () async {
+                            Navigator.pop(ctx);
+                            final success = await provider.updateOrderStatus(order.id, order.userId, status);
+                            if (context.mounted) {
+                              if (success) {
+                                AppToast.showSuccess(
+                                  context,
+                                  'Order status updated to ${status.label}!',
+                                  title: 'Status Updated',
+                                );
+                              } else {
+                                AppToast.showError(
+                                  context,
+                                  provider.errorMessage ?? 'Failed to update order status',
+                                  title: 'Update Failed',
+                                );
+                              }
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(status.emoji, style: const TextStyle(fontSize: 18)),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        status.label,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: status == OrderStatus.cancelled ? AppTheme.error : AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                      if (status == OrderStatus.cancelled)
+                                        const Text(
+                                          'Cancels order & restores inventory back to stock',
+                                          style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                        ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                              if (isCurrent)
-                                const Icon(Icons.check_circle_rounded, color: AppTheme.primaryColor, size: 20),
-                            ],
+                                const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textMuted),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    }),
+                  ],
                 ],
               ),
             ),
@@ -549,7 +621,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
 
   String _formatDate(DateTime dt) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} · ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year} at ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -557,5 +629,6 @@ class _TabConfig {
   final String label;
   final IconData icon;
   final Color? color;
+
   const _TabConfig(this.label, this.icon, this.color);
 }

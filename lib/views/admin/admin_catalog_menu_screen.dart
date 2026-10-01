@@ -77,7 +77,6 @@ class AdminCatalogMenuScreen extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppTheme.cardBorder),
         boxShadow: [
@@ -88,7 +87,10 @@ class AdminCatalogMenuScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: ListTile(
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         leading: Container(
           width: 48,
@@ -124,7 +126,9 @@ class AdminCatalogMenuScreen extends StatelessWidget {
           context,
           MaterialPageRoute(builder: (_) => destination),
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
+    ),
     );
   }
 }

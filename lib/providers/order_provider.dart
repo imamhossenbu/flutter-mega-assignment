@@ -3,46 +3,140 @@ import 'package:flutter/foundation.dart';
 import '../models/cart_item_model.dart';
 import '../models/order_model.dart';
 import '../models/promo_code_model.dart';
-import '../services/firebase_service.dart';
+import '../repositories/order_repository.dart';
 
 class OrderProvider extends ChangeNotifier {
+  final OrderRepository _orderRepository;
+
   String _userId = '';
   List<OrderModel> _orders = [];
   List<OrderModel> _allOrders = [];
   bool _isLoading = false;
   bool _isPlacingOrder = false;
+  String? _errorMessage;
   StreamSubscription? _subscription;
   StreamSubscription? _allOrdersSub;
 
-  List<OrderModel> get orders => _orders;
-  List<OrderModel> get allOrders => _allOrders;
+  static final List<OrderModel> _sampleOrders = [
+    OrderModel(
+      id: 'ORD-98421',
+      userId: 'user_sample_1',
+      customerName: 'Rahim Ahmed',
+      customerPhone: '01712345678',
+      shippingAddress: 'House 42, Road 11, Block D, Banani, Dhaka',
+      paymentMethod: 'Cash on Delivery',
+      items: [
+        const OrderItemModel(
+          productId: 'prod_1',
+          name: 'Sony WH-1000XM5 Wireless Headphones',
+          price: 34900.0,
+          imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&q=80',
+          selectedColor: 'Black',
+          quantity: 1,
+        ),
+      ],
+      subtotal: 34900.0,
+      discount: 3490.0,
+      deliveryCharge: 60.0,
+      tax: 0.0,
+      totalAmount: 31470.0,
+      promoCode: 'MEGA10',
+      status: OrderStatus.processing,
+      createdAt: DateTime.now().subtract(const Duration(hours: 4)),
+    ),
+    OrderModel(
+      id: 'ORD-98418',
+      userId: 'user_sample_1',
+      customerName: 'Karim Ullah',
+      customerPhone: '01898765432',
+      shippingAddress: 'Flat 4B, Green Road, Dhanmondi, Dhaka',
+      paymentMethod: 'Cash on Delivery',
+      items: [
+        const OrderItemModel(
+          productId: 'prod_2',
+          name: 'Apple Watch Ultra 2 GPS + Cellular',
+          price: 98500.0,
+          imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&q=80',
+          selectedColor: 'Titanium',
+          quantity: 1,
+        ),
+      ],
+      subtotal: 98500.0,
+      discount: 0.0,
+      deliveryCharge: 60.0,
+      tax: 0.0,
+      totalAmount: 98560.0,
+      status: OrderStatus.shipped,
+      createdAt: DateTime.now().subtract(const Duration(days: 1, hours: 2)),
+    ),
+    OrderModel(
+      id: 'ORD-98410',
+      userId: 'user_sample_1',
+      customerName: 'Tanvir Hossain',
+      customerPhone: '01911223344',
+      shippingAddress: 'Holding 14, Agrabad C/A, Chittagong',
+      paymentMethod: 'Cash on Delivery',
+      items: [
+        const OrderItemModel(
+          productId: 'prod_5',
+          name: 'JBL Charge 5 Portable Bluetooth Speaker',
+          price: 13900.0,
+          imageUrl: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=800&q=80',
+          selectedColor: 'Teal',
+          quantity: 1,
+        ),
+      ],
+      subtotal: 13900.0,
+      discount: 1390.0,
+      deliveryCharge: 120.0,
+      tax: 0.0,
+      totalAmount: 12630.0,
+      status: OrderStatus.delivered,
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+    ),
+  ];
+
+  static List<OrderModel> get sampleOrders => _sampleOrders;
+
+  List<OrderModel> get orders => _orders.isEmpty ? _sampleOrders : _orders;
+  List<OrderModel> get allOrders => _allOrders.isEmpty ? _sampleOrders : _allOrders;
   bool get isLoading => _isLoading;
   bool get isPlacingOrder => _isPlacingOrder;
+  String? get errorMessage => _errorMessage;
 
   // Customer metrics
-  double get totalSpent => _orders.fold(0.0, (sum, o) => sum + o.grandTotal);
-  int get ordersCount => _orders.length;
-  int get activeOrdersCount => _orders
+  double get totalSpent => orders.fold(0.0, (sum, o) => sum + o.grandTotal);
+  int get ordersCount => orders.length;
+  int get activeOrdersCount => orders
       .where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled)
       .length;
   OrderModel? get latestActiveOrder {
     try {
-      return _orders.firstWhere(
+      return orders.firstWhere(
         (o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled,
       );
     } catch (_) {
-      return _orders.isNotEmpty ? _orders.first : null;
+      return orders.isNotEmpty ? orders.first : null;
     }
   }
 
   // Admin metrics
-  double get totalRevenue => _allOrders.fold(
-      0.0, (sum, o) => sum + (o.status != OrderStatus.cancelled ? o.grandTotal : 0.0));
-  int get totalOrdersCount => _allOrders.length;
+  double get totalRevenue => allOrders.fold(
+      0.0, (sum, o) => sum + (o.status != OrderStatus.cancelled ? o.totalAmount : 0.0));
+  int get totalOrdersCount => allOrders.length;
   int get pendingOrdersCount =>
-      _allOrders.where((o) => o.status == OrderStatus.pending || o.status == OrderStatus.confirmed).length;
-  int get shippedOrdersCount => _allOrders.where((o) => o.status == OrderStatus.shipped).length;
-  int get deliveredOrdersCount => _allOrders.where((o) => o.status == OrderStatus.delivered).length;
+      allOrders.where((o) => o.status == OrderStatus.pending).length;
+  int get processingOrdersCount =>
+      allOrders.where((o) => o.status == OrderStatus.processing).length;
+  int get shippedOrdersCount =>
+      allOrders.where((o) => o.status == OrderStatus.shipped).length;
+  int get deliveredOrdersCount =>
+      allOrders.where((o) => o.status == OrderStatus.delivered).length;
+  int get cancelledOrdersCount =>
+      allOrders.where((o) => o.status == OrderStatus.cancelled).length;
+
+  OrderProvider({OrderRepository? orderRepository})
+      : _orderRepository = orderRepository ?? FirestoreOrderRepository();
 
   void updateUserId(String newUserId) {
     if (_userId == newUserId) return;
@@ -52,109 +146,138 @@ class OrderProvider extends ChangeNotifier {
 
   void initAdminOrdersStream() {
     _allOrdersSub?.cancel();
-    try {
-      _allOrdersSub = FirebaseService.instance.streamAllOrders().listen(
-        (orders) {
-          _allOrders = orders;
-          notifyListeners();
-        },
-        onError: (e) {
-          debugPrint('Admin orders stream error: $e');
-        },
-      );
-    } catch (e) {
-      debugPrint('Admin orders stream listen error: $e');
-    }
+    _allOrdersSub = _orderRepository.streamAllOrders(limit: 50).listen(
+      (orders) {
+        _allOrders = orders;
+        notifyListeners();
+      },
+      onError: (e) {
+        debugPrint('Admin orders stream error: $e');
+      },
+    );
   }
 
   void _listenToOrders() {
     _subscription?.cancel();
+    if (_userId.isEmpty) {
+      _orders = [];
+      notifyListeners();
+      return;
+    }
+    _isLoading = true;
+    notifyListeners();
+    _subscription = _orderRepository.streamUserOrders(_userId).listen(
+      (orders) {
+        _orders = orders;
+        _isLoading = false;
+        notifyListeners();
+      },
+      onError: (e) {
+        debugPrint('Orders stream error: $e');
+        _isLoading = false;
+        notifyListeners();
+      },
+    );
+  }
+
+  Future<void> refreshUserOrders() async {
     if (_userId.isEmpty) return;
     _isLoading = true;
     notifyListeners();
     try {
-      _subscription = FirebaseService.instance.streamOrders(_userId).listen(
-        (orders) {
-          _orders = orders;
-          _isLoading = false;
-          notifyListeners();
-        },
-        onError: (e) {
-          debugPrint('Orders stream error: $e');
-          _isLoading = false;
-          notifyListeners();
-        },
-      );
+      final list = await _orderRepository.getUserOrders(_userId);
+      _orders = list;
     } catch (e) {
+      debugPrint('Refresh user orders error: $e');
+    } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<bool> updateOrderStatus(String orderId, String userId, OrderStatus newStatus) async {
-    try {
-      await FirebaseService.instance.updateOrderStatus(orderId, userId, newStatus);
-      return true;
-    } catch (e) {
-      debugPrint('Error updating order status: $e');
-      return false;
-    }
-  }
-
   Future<OrderModel?> placeOrder({
     required List<CartItemModel> cartItems,
-    required double subtotal,
-    required double discount,
-    required double shipping,
-    required double tax,
-    required double grandTotal,
+    required String customerName,
+    required String customerPhone,
     required String shippingAddress,
+    required double deliveryCharge,
     PromoCodeModel? promoCode,
+    double? subtotal,
+    double? discount,
+    double? shipping,
+    double? tax,
+    double? grandTotal,
   }) async {
     if (_userId.isEmpty || cartItems.isEmpty) return null;
 
     _isPlacingOrder = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
-      final orderId = 'order_${DateTime.now().millisecondsSinceEpoch}';
-      final orderItems = cartItems
+      final snapshotItems = cartItems
           .map((item) => OrderItemModel(
                 productId: item.product.id,
-                productName: item.product.name,
-                productImage: item.product.imageUrl,
-                productBrand: item.product.brand,
-                unitPrice: item.product.price,
-                quantity: item.quantity,
+                name: item.product.name,
+                price: item.product.price,
+                imageUrl: item.product.imageUrl,
+                unit: item.product.unit,
                 selectedColor: item.selectedColor,
                 selectedSize: item.selectedSize,
+                quantity: item.quantity,
               ))
           .toList();
 
-      final order = OrderModel(
-        id: orderId,
+      final orderId = await _orderRepository.placeOrderInTransaction(
         userId: _userId,
-        items: orderItems,
-        subtotal: subtotal,
-        discount: discount,
-        shipping: shipping,
-        tax: tax,
-        grandTotal: grandTotal,
-        promoCode: promoCode?.code,
+        customerName: customerName,
+        customerPhone: customerPhone,
         shippingAddress: shippingAddress,
-        status: OrderStatus.confirmed,
-        createdAt: DateTime.now(),
+        items: snapshotItems,
+        promoCode: promoCode?.code,
+        deliveryCharge: deliveryCharge,
       );
 
-      final result = await FirebaseService.instance.placeOrder(order);
+      final createdOrder = await _orderRepository.getOrderById(orderId);
       _isPlacingOrder = false;
       notifyListeners();
-      return result;
+      return createdOrder;
     } catch (e) {
-      debugPrint('Error placing order: $e');
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
       _isPlacingOrder = false;
       notifyListeners();
-      return null;
+      rethrow;
+    }
+  }
+
+  Future<bool> cancelCustomerOrder(String orderId) async {
+    try {
+      await _orderRepository.cancelOrderCustomer(
+        orderId: orderId,
+        userId: _userId,
+      );
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> cancelOrder(String orderId) => cancelCustomerOrder(orderId);
+
+  Future<bool> updateOrderStatus(String orderId, String userId, OrderStatus newStatus) async {
+    try {
+      await _orderRepository.updateOrderStatusAdmin(
+        orderId: orderId,
+        newStatus: newStatus,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error updating order status: $e');
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
     }
   }
 

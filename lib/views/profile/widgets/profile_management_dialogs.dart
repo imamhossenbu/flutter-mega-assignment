@@ -6,13 +6,187 @@ import '../../../core/widgets/app_toast.dart';
 import '../../../providers/auth_provider.dart';
 
 class ProfileManagementDialogs {
+  /// Opens a versatile sheet to choose Gallery, Camera, Image URL, or Remove Photo
+  static Future<void> showPhotoUploadSheet(
+    BuildContext context,
+    AuthProvider auth, {
+    VoidCallback? onUpdated,
+  }) async {
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Update Profile Picture',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: AppTheme.primaryColor),
+                ),
+                title: const Text('Choose from Gallery'),
+                subtitle: const Text('Select a picture from your device storage'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  AppToast.showInfo(context, 'Uploading profile photo... ⏳', title: 'Uploading');
+                  final url = await auth.uploadProfileImage(source: ImageSource.gallery);
+                  if (context.mounted) {
+                    if (url != null) {
+                      AppToast.showSuccess(context, 'Profile picture updated! ✨', title: 'Profile Updated');
+                      onUpdated?.call();
+                    } else {
+                      AppToast.showError(
+                        context,
+                        'Upload failed. You can also paste an image URL.',
+                        title: 'Upload Failed',
+                      );
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: Colors.blue),
+                ),
+                title: const Text('Take a Photo'),
+                subtitle: const Text('Use your device camera to take a new picture'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  AppToast.showInfo(context, 'Uploading profile photo... ⏳', title: 'Uploading');
+                  final url = await auth.uploadProfileImage(source: ImageSource.camera);
+                  if (context.mounted) {
+                    if (url != null) {
+                      AppToast.showSuccess(context, 'Profile picture updated! ✨', title: 'Profile Updated');
+                      onUpdated?.call();
+                    } else {
+                      AppToast.showError(context, 'Failed to capture photo.', title: 'Upload Failed');
+                    }
+                  }
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.link_rounded, color: Colors.purple),
+                ),
+                title: const Text('Enter Image URL'),
+                subtitle: const Text('Paste direct URL to a web photo or avatar'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showImageUrlDialog(context, auth, onUpdated: onUpdated);
+                },
+              ),
+              if (auth.photoUrl.isNotEmpty) ...[
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: AppTheme.error),
+                  ),
+                  title: const Text(
+                    'Remove Photo',
+                    style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text('Revert back to default avatar'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await auth.updateProfile(photoUrl: '');
+                    if (context.mounted) {
+                      AppToast.showSuccess(context, 'Profile photo removed.', title: 'Photo Removed');
+                      onUpdated?.call();
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static void _showImageUrlDialog(
+    BuildContext context,
+    AuthProvider auth, {
+    VoidCallback? onUpdated,
+  }) {
+    final urlCtrl = TextEditingController(text: auth.photoUrl);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Set Profile Image URL', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter a direct public URL for your profile picture (JPG, PNG, WebP):',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: urlCtrl,
+              decoration: const InputDecoration(
+                hintText: 'https://images.unsplash.com/...',
+                prefixIcon: Icon(Icons.image_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final newUrl = urlCtrl.text.trim();
+              Navigator.pop(ctx);
+              if (newUrl.isNotEmpty) {
+                await auth.updateProfile(photoUrl: newUrl);
+                if (context.mounted) {
+                  AppToast.showSuccess(context, 'Profile image updated! ✨', title: 'Profile Updated');
+                  onUpdated?.call();
+                }
+              }
+            },
+            child: const Text('Save URL'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Opens a fully validated dialog for updating name, phone number, and photo
   static void showEditProfileDialog(BuildContext context, AuthProvider auth) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: auth.displayName);
     final phoneCtrl = TextEditingController(text: auth.phone);
     bool isSaving = false;
-    bool isUploadingPhoto = false;
 
     showDialog(
       context: context,
@@ -38,47 +212,61 @@ class ProfileManagementDialogs {
                       clipBehavior: Clip.none,
                       children: [
                         CircleAvatar(
-                          radius: 34,
+                          radius: 38,
                           backgroundColor: AppTheme.primaryColor.withOpacity(0.12),
                           backgroundImage: auth.photoUrl.isNotEmpty
                               ? CachedNetworkImageProvider(auth.photoUrl)
                               : null,
-                          child: isUploadingPhoto
-                              ? const CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor)
-                              : (auth.photoUrl.isEmpty
-                                  ? Text(
-                                      auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
-                                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
-                                    )
-                                  : null),
+                          child: auth.photoUrl.isEmpty
+                              ? Text(
+                                  auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                )
+                              : null,
                         ),
                         Positioned(
                           bottom: -2,
                           right: -2,
                           child: InkWell(
-                            onTap: isUploadingPhoto
-                                ? null
-                                : () async {
-                                    setState(() => isUploadingPhoto = true);
-                                    await auth.uploadProfileImage(source: ImageSource.gallery);
-                                    setState(() => isUploadingPhoto = false);
-                                  },
-                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              showPhotoUploadSheet(
+                                context,
+                                auth,
+                                onUpdated: () => setState(() {}),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(18),
                             child: Container(
-                              padding: const EdgeInsets.all(6),
+                              padding: const EdgeInsets.all(7),
                               decoration: BoxDecoration(
                                 color: AppTheme.primaryColor,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: 2),
                               ),
-                              child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                              child: const Icon(Icons.camera_alt_rounded, size: 15, color: Colors.white),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      showPhotoUploadSheet(
+                        context,
+                        auth,
+                        onUpdated: () => setState(() {}),
+                      );
+                    },
+                    icon: const Icon(Icons.photo_camera_rounded, size: 16),
+                    label: const Text('Change Photo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(
@@ -133,7 +321,11 @@ class ProfileManagementDialogs {
                       if (context.mounted) {
                         Navigator.pop(ctx);
                         if (success) {
-                          AppToast.showSuccess(context, 'Profile updated successfully! ✨', title: 'Profile Updated');
+                          AppToast.showSuccess(
+                            context,
+                            'Profile updated successfully! ✨',
+                            title: 'Profile Updated',
+                          );
                         } else {
                           AppToast.showError(context, 'Failed to update profile.', title: 'Update Failed');
                         }
@@ -277,7 +469,11 @@ class ProfileManagementDialogs {
                       if (success) {
                         if (context.mounted) {
                           Navigator.pop(ctx);
-                          AppToast.showSuccess(context, 'Password updated successfully! 🔒', title: 'Password Changed');
+                          AppToast.showSuccess(
+                            context,
+                            'Password updated successfully! 🔒',
+                            title: 'Password Changed',
+                          );
                         }
                       } else {
                         setState(() {

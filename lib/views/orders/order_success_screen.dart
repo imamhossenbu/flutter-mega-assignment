@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/order_model.dart';
 import '../main_navigation_screen.dart';
@@ -12,11 +13,12 @@ class OrderSuccessScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
+        child: SizedBox.expand(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Success animation
                 Container(
@@ -43,7 +45,7 @@ class OrderSuccessScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Your order #${order.id.substring(6, 16)} has been confirmed.',
+                  'Your order #${order.id.length > 8 ? order.id.substring(0, 8).toUpperCase() : order.id} has been placed via Cash on Delivery.',
                   style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                   textAlign: TextAlign.center,
                 ),
@@ -60,7 +62,8 @@ class OrderSuccessScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _infoRow('Items', '${order.items.length} item(s)'),
-                      _infoRow('Total', '\$${order.grandTotal.toStringAsFixed(2)}'),
+                      _infoRow('Total', AppConstants.formatCurrency(order.grandTotal)),
+                      _infoRow('Payment', 'Cash on Delivery (COD)'),
                       _infoRow('Status', '${order.status.emoji} ${order.status.label}'),
                       _infoRow('Deliver to', order.shippingAddress, wrap: true),
                     ],

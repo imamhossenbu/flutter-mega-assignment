@@ -21,7 +21,7 @@ class FilterOptions {
   final SortOption sortBy;
 
   static const double minAvailablePrice = 0.0;
-  static const double maxAvailablePrice = 2500.0;
+  static const double maxAvailablePrice = 100000.0; // BDT range up to ৳100,000
 
   const FilterOptions({
     this.searchQuery = '',

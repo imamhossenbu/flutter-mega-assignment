@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../models/address_model.dart';
+import '../../providers/address_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
@@ -18,39 +21,66 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _nameController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _zipController = TextEditingController();
-  String _selectedPayment = 'Credit Card';
+  final _phoneController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _streetController = TextEditingController();
+
+  bool _isDhaka = true;
+  bool _saveAddress = true;
+  bool _useNewAddress = false;
+  String? _selectedAddressId;
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill name from auth
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
-      if (auth.displayName.isNotEmpty && auth.displayName != 'Guest Shopper') {
-        _nameController.text = auth.displayName;
+      if (auth.isAuthenticated) {
+        context.read<AddressProvider>().initAddresses(auth.userId);
       }
+      _prefillUserData();
     });
+  }
+
+  void _prefillUserData() {
+    final auth = context.read<AuthProvider>();
+    if (auth.displayName.isNotEmpty && auth.displayName != 'Guest Shopper') {
+      _nameController.text = auth.displayName;
+    }
+    if (auth.phone.isNotEmpty) {
+      _phoneController.text = auth.phone;
+    }
+    if (_districtController.text.isEmpty) {
+      _districtController.text = 'Dhaka';
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _addressController.dispose();
-    _cityController.dispose();
-    _zipController.dispose();
+    _phoneController.dispose();
+    _districtController.dispose();
+    _streetController.dispose();
     super.dispose();
   }
 
-  Future<void> _placeOrder() async {
-    if (!_formKey.currentState!.validate()) return;
-    final cart = context.read<CartProvider>();
-    final orderProvider = context.read<OrderProvider>();
-    final auth = context.read<AuthProvider>();
+  void _onAddressSelected(AddressModel addr) {
+    setState(() {
+      _selectedAddressId = addr.id;
+      _useNewAddress = false;
+      _nameController.text = addr.name;
+      _phoneController.text = addr.phone;
+      _districtController.text = addr.district;
+      _streetController.text = addr.detailedAddress;
+      _isDhaka = addr.isDhaka;
+    });
+    context.read<CartProvider>().setDeliveryZone(isDhaka: addr.isDhaka);
+  }
 
+  Future<void> _placeOrder() async {
+    final auth = context.read<AuthProvider>();
     if (auth.isGuest) {
       AppToast.showWarning(
         context,
@@ -64,33 +94,62 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
+    if (!_formKey.currentState!.validate()) {
+      AppToast.showWarning(context, 'Please complete the address form properly.');
+      return;
+    }
+
+    final cart = context.read<CartProvider>();
+    final orderProvider = context.read<OrderProvider>();
+    final addressProvider = context.read<AddressProvider>();
+
+    final cleanPhone = AppConstants.normalizePhone(_phoneController.text.trim());
     final shippingAddress =
-        '${_nameController.text.trim()}, ${_addressController.text.trim()}, ${_cityController.text.trim()} ${_zipController.text.trim()}';
+        '${_streetController.text.trim()}, ${_districtController.text.trim()}';
+
+    // Optionally save address to user's address book
+    if (_useNewAddress && _saveAddress && auth.isAuthenticated) {
+      final newAddr = AddressModel(
+        id: '',
+        name: _nameController.text.trim(),
+        phone: cleanPhone,
+        district: _districtController.text.trim(),
+        detailedAddress: _streetController.text.trim(),
+        isDhaka: _isDhaka,
+        isDefault: !addressProvider.hasAddresses,
+      );
+      addressProvider.addAddress(newAddr);
+    }
+
+    final deliveryCharge = _isDhaka
+        ? AppConstants.deliveryFeeDhaka
+        : AppConstants.deliveryFeeOutsideDhaka;
 
     final order = await orderProvider.placeOrder(
       cartItems: cart.items.toList(),
+      customerName: _nameController.text.trim(),
+      customerPhone: cleanPhone,
+      shippingAddress: shippingAddress,
+      deliveryCharge: deliveryCharge,
+      promoCode: cart.appliedPromo,
       subtotal: cart.subtotal,
       discount: cart.discountAmount,
-      shipping: cart.shippingFee,
+      shipping: deliveryCharge,
       tax: cart.taxAmount,
       grandTotal: cart.grandTotal,
-      shippingAddress: shippingAddress,
-      promoCode: cart.appliedPromo,
     );
 
     if (!mounted) return;
 
     if (order != null) {
-      cart.removePromoCode();
+      cart.clearCart();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => OrderSuccessScreen(order: order)),
       );
     } else {
-      AppToast.showError(
-        context,
-        'Failed to place order. Please try again.',
-        title: 'Order Failed',
-      );
+      final err = orderProvider.errorMessage ??
+          'Failed to place order. Please review your cart and try again.';
+      AppToast.showError(context, err, title: 'Order Placement Error');
     }
   }
 
@@ -98,19 +157,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final orderProvider = context.watch<OrderProvider>();
+    final addressProvider = context.watch<AddressProvider>();
     final auth = context.watch<AuthProvider>();
+
+    final savedAddresses = addressProvider.addresses;
+    final hasSaved = savedAddresses.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: AppBar(title: const Text('Checkout')),
+      appBar: AppBar(
+        title: const Text('Checkout'),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Guest warning
+              // Guest Warning
               if (auth.isGuest) ...[
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -125,7 +191,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       const SizedBox(width: 10),
                       const Expanded(
                         child: Text(
-                          'Sign in to save your order history.',
+                          'Sign in to place your order with verified account.',
                           style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
                         ),
                       ),
@@ -141,56 +207,441 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(height: 16),
               ],
 
-              _buildSectionHeader('Shipping Information', Icons.local_shipping_outlined),
+              // Delivery Address Section
+              _buildSectionHeader('Delivery Address', Icons.location_on_outlined),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Full Name',
-                  prefixIcon: Icon(Icons.person_outline_rounded),
-                ),
-                validator: (v) => v == null || v.isEmpty ? 'Name is required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(
-                  labelText: 'Street Address',
-                  prefixIcon: Icon(Icons.home_outlined),
-                ),
-                validator: (v) => v == null || v.isEmpty ? 'Address is required' : null,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _cityController,
-                      decoration: const InputDecoration(labelText: 'City'),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _zipController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'ZIP'),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
 
-              _buildSectionHeader('Payment Method', Icons.payment_outlined),
+              // Saved Addresses Selector
+              if (hasSaved) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.cardBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Saved Addresses',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _useNewAddress = !_useNewAddress;
+                                if (_useNewAddress) {
+                                  _selectedAddressId = null;
+                                }
+                              });
+                            },
+                            icon: Icon(
+                              _useNewAddress ? Icons.check_circle_outline : Icons.add,
+                              size: 16,
+                            ),
+                            label: Text(
+                              _useNewAddress ? 'Use Saved' : 'Add New',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!_useNewAddress) ...[
+                        const SizedBox(height: 8),
+                        ...savedAddresses.map((addr) {
+                          final isSelected = _selectedAddressId == addr.id ||
+                              (_selectedAddressId == null && addr.isDefault);
+                          return InkWell(
+                            onTap: () => _onAddressSelected(addr),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppTheme.primaryColor.withOpacity(0.06)
+                                    : Colors.grey.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppTheme.primaryColor
+                                      : Colors.grey.shade200,
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isSelected
+                                        ? Icons.radio_button_checked
+                                        : Icons.radio_button_off,
+                                    color: isSelected
+                                        ? AppTheme.primaryColor
+                                        : Colors.grey.shade400,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              addr.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              addr.phone,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppTheme.textSecondary,
+                                              ),
+                                            ),
+                                            if (addr.isDefault) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppTheme.primaryColor.withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text(
+                                                  'Default',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: AppTheme.primaryColor,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          addr.fullAddress,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Address Form (if no saved address, or user clicked "Add New")
+              if (!hasSaved || _useNewAddress) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.cardBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Recipient Details',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Recipient Full Name *',
+                          prefixIcon: Icon(Icons.person_outline),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Recipient name is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number (e.g. 01712345678) *',
+                          prefixIcon: Icon(Icons.phone_outlined),
+                          helperText: '11 digits Bangladesh phone number',
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Phone number is mandatory';
+                          }
+                          if (!AppConstants.isValidPhone(v)) {
+                            return 'Enter a valid 11-digit BD number (01XXXXXXXXX)';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Delivery Zone Selection
+                      const Text(
+                        'Delivery Area / Zone *',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isDhaka = true;
+                                  if (_districtController.text.trim().toLowerCase() != 'dhaka') {
+                                    _districtController.text = 'Dhaka';
+                                  }
+                                });
+                                context.read<CartProvider>().setDeliveryZone(isDhaka: true);
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                                decoration: BoxDecoration(
+                                  color: _isDhaka
+                                      ? AppTheme.primaryColor.withOpacity(0.08)
+                                      : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _isDhaka
+                                        ? AppTheme.primaryColor
+                                        : Colors.grey.shade300,
+                                    width: _isDhaka ? 2 : 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Inside Dhaka',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: _isDhaka
+                                            ? AppTheme.primaryColor
+                                            : AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      AppConstants.formatCurrency(AppConstants.deliveryFeeDhaka),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: _isDhaka
+                                            ? AppTheme.primaryColor
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isDhaka = false;
+                                  if (_districtController.text.trim().toLowerCase() == 'dhaka') {
+                                    _districtController.clear();
+                                  }
+                                });
+                                context.read<CartProvider>().setDeliveryZone(isDhaka: false);
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                                decoration: BoxDecoration(
+                                  color: !_isDhaka
+                                      ? AppTheme.primaryColor.withOpacity(0.08)
+                                      : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: !_isDhaka
+                                        ? AppTheme.primaryColor
+                                        : Colors.grey.shade300,
+                                    width: !_isDhaka ? 2 : 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Outside Dhaka',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: !_isDhaka
+                                            ? AppTheme.primaryColor
+                                            : AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      AppConstants.formatCurrency(AppConstants.deliveryFeeOutsideDhaka),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: !_isDhaka
+                                            ? AppTheme.primaryColor
+                                            : AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: _districtController,
+                        decoration: InputDecoration(
+                          labelText: _isDhaka ? 'Area in Dhaka (e.g. Dhanmondi, Gulshan) *' : 'District & Thana *',
+                          prefixIcon: const Icon(Icons.location_city_outlined),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Area/District is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _streetController,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Detailed Street Address (House, Road, Block) *',
+                          prefixIcon: Icon(Icons.home_outlined),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Detailed street address is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (auth.isAuthenticated) ...[
+                        const SizedBox(height: 8),
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Save this address for future orders',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                          value: _saveAddress,
+                          onChanged: (val) => setState(() => _saveAddress = val ?? true),
+                          controlAffinity: ListTileControlAffinity.leading,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Payment Method Section - CASH ON DELIVERY ONLY
+              _buildSectionHeader('Payment Method', Icons.payments_outlined),
               const SizedBox(height: 12),
-              ...[
-                ('Credit Card', Icons.credit_card_rounded),
-                ('Cash on Delivery', Icons.money_rounded),
-                ('Mobile Banking', Icons.phone_android_rounded),
-              ].map((method) => _buildPaymentOption(method.$1, method.$2)),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.primaryColor, width: 2),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF059669).withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.payments_rounded,
+                        color: Color(0xFF059669),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Cash on Delivery (COD)',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: Color(0xFF059669),
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Pay with cash to our delivery executive when your package arrives at your doorstep.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
 
               // Order Summary
@@ -213,53 +664,93 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: kIsWeb
-                                  ? Image.network(item.product.imageUrl,
-                                      width: 44, height: 44, fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        width: 44, height: 44,
+                                  ? Image.network(
+                                      item.product.imageUrl,
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => Container(
+                                        width: 44,
+                                        height: 44,
                                         color: Colors.grey.shade100,
-                                        child: const Icon(Icons.image_not_supported_outlined, size: 18, color: Colors.grey),
-                                      ))
-                                  : Image.network(item.product.imageUrl,
-                                      width: 44, height: 44, fit: BoxFit.cover),
+                                        child: const Icon(Icons.inventory_2_outlined,
+                                            size: 18, color: Colors.grey),
+                                      ),
+                                    )
+                                  : Image.network(
+                                      item.product.imageUrl,
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                    ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                item.product.name,
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.product.name,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (item.selectedSize != null || item.selectedColor != null)
+                                    Text(
+                                      [
+                                        if (item.selectedColor != null) item.selectedColor,
+                                        if (item.selectedSize != null) item.selectedSize,
+                                      ].join(' • '),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppTheme.textMuted,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             Text(
                               'x${item.quantity}',
-                              style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                              style: const TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 12,
+                              ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Text(
-                              '\$${item.totalPrice.toStringAsFixed(2)}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              AppConstants.formatCurrency(item.totalPrice),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
                     const Divider(height: 20),
-                    _summaryRow('Subtotal', '\$${cart.subtotal.toStringAsFixed(2)}'),
+                    _summaryRow('Subtotal', AppConstants.formatCurrency(cart.subtotal)),
                     if (cart.discountAmount > 0)
                       _summaryRow(
-                          'Discount (${cart.appliedPromoCode})',
-                          '-\$${cart.discountAmount.toStringAsFixed(2)}',
-                          color: AppTheme.success),
-                    _summaryRow('Shipping',
-                        cart.shippingFee == 0 ? 'FREE' : '\$${cart.shippingFee.toStringAsFixed(2)}',
-                        color: cart.shippingFee == 0 ? AppTheme.success : null),
-                    _summaryRow('Tax (5%)', '\$${cart.taxAmount.toStringAsFixed(2)}'),
+                        'Discount (${cart.appliedPromoCode})',
+                        '-${AppConstants.formatCurrency(cart.discountAmount)}',
+                        color: AppTheme.success,
+                      ),
+                    _summaryRow(
+                      'Delivery Charge (${_isDhaka ? "Inside Dhaka" : "Outside Dhaka"})',
+                      AppConstants.formatCurrency(cart.deliveryFee),
+                    ),
+                    _summaryRow(
+                      'Tax (5% VAT)',
+                      AppConstants.formatCurrency(cart.taxAmount),
+                    ),
                     const Divider(height: 20),
                     _summaryRow(
                       'Grand Total',
-                      '\$${cart.grandTotal.toStringAsFixed(2)}',
+                      AppConstants.formatCurrency(cart.grandTotal),
                       isBold: true,
                       color: AppTheme.primaryColor,
                     ),
@@ -275,7 +766,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, -4)),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
           ],
           border: const Border(top: BorderSide(color: AppTheme.cardBorder)),
         ),
@@ -283,18 +778,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           top: false,
           child: SizedBox(
             width: double.infinity,
+            height: 52,
             child: ElevatedButton(
               onPressed: orderProvider.isPlacingOrder ? null : _placeOrder,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
               child: orderProvider.isPlacingOrder
                   ? const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        ),
                         SizedBox(width: 12),
-                        Text('Placing Order...'),
+                        Text('Confirming Order via Secure Transaction...'),
                       ],
                     )
-                  : Text('Place Order • \$${cart.grandTotal.toStringAsFixed(2)}'),
+                  : Text(
+                      'Confirm Order (COD) • ${AppConstants.formatCurrency(cart.grandTotal)}',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ),
@@ -309,46 +824,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPaymentOption(String label, IconData icon) {
-    final isSelected = _selectedPayment == label;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedPayment = label),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor.withOpacity(0.06) : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? AppTheme.primaryColor : AppTheme.cardBorder,
-            width: isSelected ? 2 : 1,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
           ),
         ),
-        child: Row(
-          children: [
-            Icon(icon, size: 22, color: isSelected ? AppTheme.primaryColor : AppTheme.textMuted),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
-                fontSize: 14,
-              ),
-            ),
-            const Spacer(),
-            if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: AppTheme.primaryColor, size: 20),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
@@ -358,18 +840,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isBold ? AppTheme.textPrimary : AppTheme.textSecondary,
-                fontWeight: isBold ? FontWeight.w700 : FontWeight.normal,
-              )),
-          Text(value,
-              style: TextStyle(
-                fontSize: isBold ? 16 : 13,
-                fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-                color: color ?? AppTheme.textPrimary,
-              )),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: isBold ? AppTheme.textPrimary : AppTheme.textSecondary,
+              fontWeight: isBold ? FontWeight.w700 : FontWeight.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isBold ? 16 : 13,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+              color: color ?? AppTheme.textPrimary,
+            ),
+          ),
         ],
       ),
     );

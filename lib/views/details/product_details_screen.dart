@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../services/cloudinary_service.dart';
 import '../../models/product_model.dart';
 import '../../models/review_model.dart';
 import '../../providers/auth_provider.dart';
@@ -124,7 +126,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             ),
                           )
                         : CachedNetworkImage(
-                            imageUrl: product.imageUrl,
+                            imageUrl: CloudinaryService.detail(product.imageUrl),
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
                               color: Colors.grey.shade100,
@@ -297,7 +299,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     textBaseline: TextBaseline.alphabetic,
                     children: [
                       Text(
-                        '\$${product.price.toStringAsFixed(2)}',
+                        AppConstants.formatCurrency(product.price),
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
@@ -307,7 +309,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       if (product.originalPrice > product.price) ...[
                         const SizedBox(width: 10),
                         Text(
-                          '\$${product.originalPrice.toStringAsFixed(2)}',
+                          AppConstants.formatCurrency(product.originalPrice),
                           style: const TextStyle(
                             fontSize: 16,
                             decoration: TextDecoration.lineThrough,
@@ -355,6 +357,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       children: product.colors.map((colorName) {
                         final isSelected = _selectedColor == colorName;
                         return ChoiceChip(
+                          showCheckmark: false,
                           label: Text(colorName),
                           selected: isSelected,
                           selectedColor: AppTheme.primaryColor,
@@ -393,6 +396,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       children: product.sizes.map((sizeName) {
                         final isSelected = _selectedSize == sizeName;
                         return ChoiceChip(
+                          showCheckmark: false,
                           label: Text(sizeName),
                           selected: isSelected,
                           selectedColor: AppTheme.primaryDark,
@@ -547,7 +551,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       const Icon(Icons.shopping_bag_outlined, size: 20),
                       const SizedBox(width: 8),
                       Text(
-                        'Add to Cart • \$${(product.price * _quantity).toStringAsFixed(2)}',
+                        'Add to Cart • ${AppConstants.formatCurrency(product.price * _quantity)}',
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,

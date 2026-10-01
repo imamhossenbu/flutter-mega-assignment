@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users collection
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      // On create: must be own doc and role MUST be 'customer'
+      allow create: if isOwner(uid) &&
+        request.resource.data.role == 'customer';
+
+      // On update: user can update their own profile, but can NEVER modify their 'role'
+      allow update: if (isOwner(uid) &&
+        request.resource.data.role == resource.data.role) || isAdmin();
+
+      allow delete: if isAdmin();
+
+      // Addresses subcollection
+      match /addresses/{addressId} {
+        allow read, write: if isOwner(uid) || isAdmin();
+      }
+    }
+
+    // Categories (Public read, admin write)
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Brands (Public read, admin write)
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Products (Public read, admin write, supports soft delete)
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Promo codes (Signed-in read, admin write)
+    match /promo_codes/{codeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Orders collection
+    match /orders/{orderId} {
+      // Customer can read own orders, Admin can read all
+      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+
+      // Customer can create order only with Cash on Delivery and Pending status
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'Pending' &&
+        request.resource.data.paymentMethod == 'Cash on Delivery';
+
+      // Updates:
+      // Customer: Can ONLY cancel own order when current status is Pending
+      // Admin: Follows strict state machine transitions
+      allow update: if (
+        isOwner(resource.data.userId) &&
+        resource.data.status == 'Pending' &&
+        request.resource.data.status == 'Cancelled' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+      ) || (
+        isAdmin() && (
+          (resource.data.status == 'Pending' && (request.resource.data.status == 'Processing' || request.resource.data.status == 'Cancelled')) ||
+          (resource.data.status == 'Processing' && (request.resource.data.status == 'Shipped' || request.resource.data.status == 'Cancelled')) ||
+          (resource.data.status == 'Shipped' && request.resource.data.status == 'Delivered') ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']))
+        )
+      );
+
+      // No one is allowed to delete order history
+      allow delete: if false;
+    }
+  }
+}

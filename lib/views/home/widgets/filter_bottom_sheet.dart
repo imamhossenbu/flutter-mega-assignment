@@ -131,6 +131,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       children: SortOption.values.map((sort) {
                         final isSelected = _tempOptions.sortBy == sort;
                         return ChoiceChip(
+                          showCheckmark: false,
                           avatar: Icon(
                             sort.icon,
                             size: 16,
@@ -168,6 +169,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       children: AppConstants.categories.map((cat) {
                         final isSelected = _tempOptions.selectedCategory == cat.id;
                         return FilterChip(
+                          showCheckmark: false,
                           avatar: Icon(
                             cat.icon,
                             size: 16,
@@ -199,7 +201,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
                     // 3. Price Range
                     _buildSectionHeader(
-                      'Price Range: \$${_tempOptions.priceRange.start.round()} - \$${_tempOptions.priceRange.end.round()}',
+                      'Price Range: ${AppConstants.formatCurrency(_tempOptions.priceRange.start)} - ${AppConstants.formatCurrency(_tempOptions.priceRange.end)}',
                     ),
                     RangeSlider(
                       values: _tempOptions.priceRange,
@@ -209,8 +211,8 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       activeColor: AppTheme.primaryColor,
                       inactiveColor: Colors.grey.shade200,
                       labels: RangeLabels(
-                        '\$${_tempOptions.priceRange.start.round()}',
-                        '\$${_tempOptions.priceRange.end.round()}',
+                        AppConstants.formatCurrency(_tempOptions.priceRange.start),
+                        AppConstants.formatCurrency(_tempOptions.priceRange.end),
                       ),
                       onChanged: (newRange) {
                         setState(() {

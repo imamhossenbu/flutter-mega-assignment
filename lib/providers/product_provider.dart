@@ -1,40 +1,51 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/constants/app_constants.dart';
 import '../models/filter_options.dart';
 import '../models/product_model.dart';
-import '../services/firebase_service.dart';
-import '../services/seed_data_service.dart';
+import '../repositories/product_repository.dart';
 
 class ProductProvider extends ChangeNotifier {
+  final ProductRepository _productRepository;
+
   List<ProductModel> _allProducts = [];
   FilterOptions _filterOptions = const FilterOptions();
   bool _isLoading = true;
   String? _errorMessage;
   StreamSubscription? _subscription;
 
-  List<ProductModel> get allProducts => _allProducts;
+  List<ProductModel> get allProducts =>
+      _allProducts.isEmpty ? AppConstants.initialProducts : _allProducts;
   FilterOptions get filterOptions => _filterOptions;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  ProductProvider() {
+  int get totalProductsCount => allProducts.where((p) => !p.isDeleted).length;
+  int get lowStockCount =>
+      allProducts.where((p) => !p.isDeleted && p.stockCount > 0 && p.stockCount <= 5).length;
+  int get outOfStockCount =>
+      allProducts.where((p) => !p.isDeleted && p.stockCount <= 0).length;
+  List<ProductModel> get lowStockProducts =>
+      allProducts.where((p) => !p.isDeleted && p.stockCount <= 5).toList();
+
+  List<String> get allCategories {
+    final list = _allProducts.isEmpty ? AppConstants.initialProducts : _allProducts;
+    final cats = list.map((p) => p.category).toSet().toList();
+    cats.sort();
+    return ['All', ...cats];
+  }
+
+  ProductProvider({ProductRepository? productRepository})
+      : _productRepository = productRepository ?? FirestoreProductRepository() {
     _initialize();
   }
 
-  Future<void> _initialize() async {
+  void _initialize() {
     _isLoading = true;
     notifyListeners();
 
-    // Seed initial products to Firestore if collection is empty (first run only)
     try {
-      await SeedDataService.seedInitialProductsIfNeeded();
-    } catch (e) {
-      debugPrint('Firestore seed check failed: $e');
-    }
-
-    // Listen to real-time updates from Firestore — only real data
-    try {
-      _subscription = FirebaseService.instance.streamProducts().listen(
+      _subscription = _productRepository.streamProducts(includeDeleted: false).listen(
         (products) {
           _allProducts = products;
           _isLoading = false;
@@ -42,14 +53,14 @@ class ProductProvider extends ChangeNotifier {
           notifyListeners();
         },
         onError: (err) {
-          debugPrint('Firestore stream products error: $err');
+          debugPrint('Product stream error: $err');
           _isLoading = false;
           _errorMessage = 'Failed to load products. Please check your connection.';
           notifyListeners();
         },
       );
     } catch (e) {
-      debugPrint('Firestore listen setup error: $e');
+      debugPrint('Product stream setup error: $e');
       _isLoading = false;
       _errorMessage = 'Failed to connect to store. Please try again.';
       notifyListeners();
@@ -78,12 +89,20 @@ class ProductProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> reseedSampleProducts() async {
+  Future<void> refresh() async {
     _isLoading = true;
     notifyListeners();
-    await SeedDataService.reseedAllProducts();
-    _isLoading = false;
-    notifyListeners();
+    try {
+      final list = await _productRepository.getProducts(includeDeleted: false);
+      _allProducts = list;
+      _isLoading = false;
+      _errorMessage = null;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Could not refresh products. Please try again.';
+      notifyListeners();
+    }
   }
 
   List<ProductModel> get filteredProducts {
@@ -95,6 +114,9 @@ class ProductProvider extends ChangeNotifier {
     final sortBy = _filterOptions.sortBy;
 
     var list = _allProducts.where((product) {
+      // Exclude soft-deleted products
+      if (product.isDeleted) return false;
+
       // Category filter
       if (category != 'All' && !product.category.toLowerCase().contains(category.toLowerCase())) {
         return false;
@@ -133,9 +155,7 @@ class ProductProvider extends ChangeNotifier {
     switch (sortBy) {
       case SortOption.featured:
         list.sort((a, b) {
-          if (a.isFeatured == b.isFeatured) {
-            return b.rating.compareTo(a.rating);
-          }
+          if (a.isFeatured == b.isFeatured) return 0;
           return a.isFeatured ? -1 : 1;
         });
         break;
@@ -158,68 +178,63 @@ class ProductProvider extends ChangeNotifier {
 
   ProductModel? findById(String id) {
     try {
-      return _allProducts.firstWhere((p) => p.id == id);
+      return _allProducts.firstWhere((p) => p.id == id && !p.isDeleted);
     } catch (_) {
       return null;
     }
   }
 
-  // Categories derived from actual product data (plus 'All')
-  List<String> get allCategories {
-    final set = <String>{'All'};
-    for (final p in _allProducts) {
-      if (p.category.trim().isNotEmpty) {
-        set.add(p.category.trim());
-      }
-    }
-    return set.toList();
-  }
+  List<ProductModel> get featuredProducts =>
+      _allProducts.where((p) => p.isFeatured && !p.isDeleted).toList();
 
-  int get totalProductsCount => _allProducts.length;
-  int get inStockCount => _allProducts.where((p) => p.inStock && p.stockCount > 0).length;
-  int get lowStockCount => _allProducts.where((p) => p.stockCount > 0 && p.stockCount <= 5).length;
-  int get outOfStockCount => _allProducts.where((p) => !p.inStock || p.stockCount <= 0).length;
-  List<ProductModel> get lowStockProducts =>
-      _allProducts.where((p) => !p.inStock || p.stockCount <= 5).toList();
+  List<ProductModel> get popularProducts =>
+      _allProducts.where((p) => p.rating >= 4.7 && !p.isDeleted).toList();
 
   Future<bool> addProduct(ProductModel product) async {
     try {
-      await FirebaseService.instance.addProduct(product);
+      await _productRepository.addProduct(product);
       return true;
     } catch (e) {
-      debugPrint('Error adding product: $e');
+      debugPrint('addProduct error: $e');
       return false;
     }
   }
 
   Future<bool> updateProduct(ProductModel product) async {
     try {
-      await FirebaseService.instance.updateProduct(product);
+      await _productRepository.updateProduct(product);
       return true;
     } catch (e) {
-      debugPrint('Error updating product: $e');
+      debugPrint('updateProduct error: $e');
       return false;
     }
   }
 
   Future<bool> deleteProduct(String productId) async {
     try {
-      await FirebaseService.instance.deleteProduct(productId);
+      await _productRepository.softDeleteProduct(productId);
       return true;
     } catch (e) {
-      debugPrint('Error deleting product: $e');
+      debugPrint('deleteProduct error: $e');
       return false;
     }
   }
 
   Future<bool> updateStock(String productId, int newStock) async {
     try {
-      await FirebaseService.instance.updateProductStock(productId, newStock);
+      await _productRepository.updateStock(productId, newStock);
       return true;
     } catch (e) {
-      debugPrint('Error updating stock: $e');
+      debugPrint('updateStock error: $e');
       return false;
     }
+  }
+
+  Future<void> reseedSampleProducts() async {
+    for (final product in AppConstants.initialProducts) {
+      await _productRepository.addProduct(product);
+    }
+    await refresh();
   }
 
   @override

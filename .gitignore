@@ -18,6 +18,19 @@ migrate_working_dir/
 *.iws
 .idea/
 
+# Node & NPM dependencies (rules_test)
+node_modules/
+**/node_modules/
+**/node_modules/**
+package-lock.json
+**/package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
@@ -48,3 +61,6 @@ app.*.map.json
 *.apk
 downloads/*.apk
 test_screen.png
+emulator_screenshot.png
+.env
+.vscode/

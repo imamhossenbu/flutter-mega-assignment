@@ -2,8 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
+import '../../services/cloudinary_service.dart';
 import '../../providers/cart_provider.dart';
 import '../orders/checkout_screen.dart';
 
@@ -195,31 +197,22 @@ class _CartScreenState extends State<CartScreen> {
                             ),
                           ),
                           const SizedBox(height: 14),
-                          _buildPriceRow('Subtotal (${cartProvider.totalQuantity} items)', '\$${cartProvider.subtotal.toStringAsFixed(2)}'),
+                          _buildPriceRow('Subtotal (${cartProvider.totalQuantity} items)', AppConstants.formatCurrency(cartProvider.subtotal)),
                           if (cartProvider.discountAmount > 0)
                             _buildPriceRow(
                               'Promo Discount',
-                              '-\$${cartProvider.discountAmount.toStringAsFixed(2)}',
+                              '-${AppConstants.formatCurrency(cartProvider.discountAmount)}',
                               isDiscount: true,
                             ),
-                          _buildPriceRow('Estimated Tax (5%)', '\$${cartProvider.taxAmount.toStringAsFixed(2)}'),
+                          _buildPriceRow('Estimated Tax (5% VAT)', AppConstants.formatCurrency(cartProvider.taxAmount)),
                           _buildPriceRow(
-                            'Shipping Fee',
-                            cartProvider.shippingFee == 0 ? 'FREE' : '\$${cartProvider.shippingFee.toStringAsFixed(2)}',
-                            isFree: cartProvider.shippingFee == 0,
+                            'Delivery Charge (${cartProvider.isDhaka ? "Inside Dhaka" : "Outside Dhaka"})',
+                            AppConstants.formatCurrency(cartProvider.deliveryFee),
                           ),
-                          if (cartProvider.shippingFee > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2, bottom: 6),
-                              child: Text(
-                                'Add \$${(150 - cartProvider.subtotal).toStringAsFixed(2)} more for FREE shipping!',
-                                style: const TextStyle(fontSize: 11.5, color: AppTheme.primaryColor, fontWeight: FontWeight.w600),
-                              ),
-                            ),
                           const Divider(height: 20),
                           _buildPriceRow(
                             'Total Amount',
-                            '\$${cartProvider.grandTotal.toStringAsFixed(2)}',
+                            AppConstants.formatCurrency(cartProvider.grandTotal),
                             isTotal: true,
                           ),
                         ],
@@ -263,7 +256,7 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                         ),
                         Text(
-                          '\$${cartProvider.grandTotal.toStringAsFixed(2)}',
+                          AppConstants.formatCurrency(cartProvider.grandTotal),
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w900,
@@ -325,13 +318,13 @@ class _CartScreenState extends State<CartScreen> {
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         width: 80, height: 80, color: Colors.grey.shade100,
                         child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
                       ),
                     )
                   : CachedNetworkImage(
-                      imageUrl: product.imageUrl,
+                      imageUrl: CloudinaryService.thumbnail(product.imageUrl),
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
@@ -409,7 +402,7 @@ class _CartScreenState extends State<CartScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '\$${item.totalPrice.toStringAsFixed(2)}',
+                        AppConstants.formatCurrency(item.totalPrice),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,

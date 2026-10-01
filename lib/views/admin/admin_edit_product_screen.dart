@@ -80,8 +80,6 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
 
   void _showCloudinaryConfigDialog(BuildContext context, {String? error}) {
     final cloudNameCtrl = TextEditingController(text: CloudinaryService.instance.cloudName);
-    final apiKeyCtrl = TextEditingController(text: CloudinaryService.instance.apiKey);
-    final apiSecretCtrl = TextEditingController(text: CloudinaryService.instance.apiSecret);
     final presetCtrl = TextEditingController(text: CloudinaryService.instance.uploadPreset);
 
     showDialog(
@@ -115,7 +113,7 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                 const SizedBox(height: 12),
               ],
               const Text(
-                'Please verify your Cloudinary Cloud Name. API Key and Secret are pre-configured.',
+                'Uses Unsigned Upload Preset. Configure via .env or update values below.',
                 style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
               ),
               const SizedBox(height: 12),
@@ -123,33 +121,16 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                 controller: cloudNameCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Cloud Name *',
-                  hintText: 'e.g. imamhossenbu or dx... (from Cloudinary dashboard)',
+                  hintText: 'e.g. your_cloud_name',
                   prefixIcon: Icon(Icons.cloud_outlined),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: apiKeyCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'API Key',
-                  prefixIcon: Icon(Icons.key_rounded),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: apiSecretCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'API Secret',
-                  prefixIcon: Icon(Icons.lock_outline_rounded),
                 ),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: presetCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Upload Preset (Optional)',
-                  hintText: 'e.g. ml_default or unsigned preset',
+                  labelText: 'Upload Preset *',
+                  hintText: 'e.g. flutter_upload (Unsigned)',
                   prefixIcon: Icon(Icons.tune_rounded),
                 ),
               ),
@@ -162,12 +143,10 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
             onPressed: () {
               CloudinaryService.instance.configure(
                 newCloudName: cloudNameCtrl.text,
-                newApiKey: apiKeyCtrl.text,
-                newApiSecret: apiSecretCtrl.text,
                 newPreset: presetCtrl.text,
               );
               Navigator.pop(ctx);
-              AppToast.showSuccess(context, 'Cloudinary configuration updated!', title: 'Configuration Saved');
+              AppToast.showSuccess(context, 'Cloudinary settings updated!', title: 'Saved');
             },
             child: const Text('Save & Apply'),
           ),
@@ -405,6 +384,8 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                                           },
                                         )
                                       : ExpansionTile(
+                                          shape: const RoundedRectangleBorder(side: BorderSide.none),
+                                          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
                                           initiallyExpanded: q.isNotEmpty || isSelected,
                                           leading: Container(
                                             width: 36,
@@ -1038,9 +1019,9 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                           controller: _priceController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: const InputDecoration(
-                            labelText: 'Selling Price (\$) *',
-                            hintText: '99.99',
-                            prefixIcon: Icon(Icons.attach_money_rounded),
+                            labelText: 'Selling Price (৳) *',
+                            hintText: '1200',
+                            prefixIcon: Icon(Icons.payments_outlined),
                           ),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Price is required';
@@ -1056,8 +1037,8 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                           controller: _originalPriceController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: const InputDecoration(
-                            labelText: 'Original Price (\$) (Optional)',
-                            hintText: '129.99',
+                            labelText: 'Original Price (৳) (Optional)',
+                            hintText: '1500',
                             prefixIcon: Icon(Icons.money_off_rounded),
                           ),
                           validator: (v) {

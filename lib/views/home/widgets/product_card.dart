@@ -2,11 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../models/product_model.dart';
 import '../../../providers/cart_provider.dart';
 import '../../../providers/wishlist_provider.dart';
+import '../../../services/cloudinary_service.dart';
 import '../../details/product_details_screen.dart';
 
 /// A unified, high-performance, animated E-Commerce Product Card.
@@ -231,29 +233,33 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   // Price
-                                  Flexible(
+                                  Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         if (product.originalPrice > product.price)
                                           Text(
-                                            '\$${product.originalPrice.toStringAsFixed(2)}',
+                                            AppConstants.formatCurrency(product.originalPrice),
                                             style: const TextStyle(
                                               fontSize: 10,
                                               decoration: TextDecoration.lineThrough,
                                               color: Color(0xFF94A3B8),
                                               fontWeight: FontWeight.w500,
                                             ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         Text(
-                                          '\$${product.price.toStringAsFixed(2)}',
+                                          AppConstants.formatCurrency(product.price),
                                           style: const TextStyle(
                                             fontSize: 14.5,
                                             fontWeight: FontWeight.w800,
                                             color: Color(0xFF0F172A),
                                             letterSpacing: -0.2,
                                           ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
                                     ),
@@ -320,15 +326,15 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                             ),
                           );
                         },
-                        errorBuilder: (_, __, ___) => _buildImagePlaceholder(),
+                        errorBuilder: (_, _, _) => _buildImagePlaceholder(),
                       )
                     : CachedNetworkImage(
-                        imageUrl: product.imageUrl,
+                        imageUrl: CloudinaryService.thumbnail(product.imageUrl),
                         fit: BoxFit.cover,
                         memCacheWidth: 400,
                         memCacheHeight: 400,
                         fadeInDuration: const Duration(milliseconds: 250),
-                        placeholder: (_, __) => Container(
+                        placeholder: (_, _) => Container(
                           color: const Color(0xFFF1F5F9),
                           child: const Center(
                             child: SizedBox(
@@ -338,7 +344,7 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                             ),
                           ),
                         ),
-                        errorWidget: (_, __, ___) => _buildImagePlaceholder(),
+                        errorWidget: (_, _, _) => _buildImagePlaceholder(),
                       ),
               ),
             ),
@@ -555,13 +561,13 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                             ? Image.network(
                                 product.imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                                errorBuilder: (_, _, _) => const Icon(Icons.image),
                               )
                             : CachedNetworkImage(
-                                imageUrl: product.imageUrl,
+                                imageUrl: CloudinaryService.thumbnail(product.imageUrl),
                                 fit: BoxFit.cover,
                                 memCacheWidth: 200,
-                                errorWidget: (_, __, ___) => const Icon(Icons.image),
+                                errorWidget: (_, _, _) => const Icon(Icons.image),
                               ),
                       ),
                     ),
@@ -578,7 +584,7 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '\$${product.price.toStringAsFixed(2)}',
+                            AppConstants.formatCurrency(product.price),
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppTheme.primaryColor),
                           ),
                         ],
@@ -602,6 +608,7 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                     children: product.colors.map((c) {
                       final isSelected = c == chosenColor;
                       return ChoiceChip(
+                        showCheckmark: false,
                         label: Text(c),
                         selected: isSelected,
                         selectedColor: AppTheme.primaryColor.withOpacity(0.15),
@@ -629,6 +636,7 @@ class _ProductCardState extends State<ProductCard> with SingleTickerProviderStat
                     children: product.sizes.map((s) {
                       final isSelected = s == chosenSize;
                       return ChoiceChip(
+                        showCheckmark: false,
                         label: Text(s),
                         selected: isSelected,
                         selectedColor: AppTheme.primaryColor.withOpacity(0.15),

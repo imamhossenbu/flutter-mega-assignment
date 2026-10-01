@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../models/order_model.dart';
@@ -126,6 +127,24 @@ class AdminDashboardScreen extends StatelessWidget {
                           leading: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.photo_camera_rounded, color: Colors.blue),
+                          ),
+                          title: const Text('Update Profile Picture', style: TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: const Text('Upload from gallery, camera or URL'),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            ProfileManagementDialogs.showPhotoUploadSheet(context, authProvider);
+                          },
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
                               color: Colors.orange.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -202,14 +221,45 @@ class AdminDashboardScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
+                          GestureDetector(
+                            onTap: () => ProfileManagementDialogs.showPhotoUploadSheet(context, authProvider),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                CircleAvatar(
+                                  radius: 23,
+                                  backgroundColor: AppTheme.primaryColor.withOpacity(0.3),
+                                  backgroundImage: authProvider.photoUrl.isNotEmpty
+                                      ? CachedNetworkImageProvider(authProvider.photoUrl)
+                                      : null,
+                                  child: authProvider.photoUrl.isEmpty
+                                      ? Text(
+                                          authProvider.displayName.isNotEmpty
+                                              ? authProvider.displayName[0].toUpperCase()
+                                              : 'A',
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                Positioned(
+                                  bottom: -2,
+                                  right: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primaryColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: const Color(0xFF1E293B), width: 1.5),
+                                    ),
+                                    child: const Icon(Icons.camera_alt_rounded, size: 10, color: Colors.white),
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: const Icon(Icons.admin_panel_settings_rounded, color: AppTheme.primaryLight, size: 24),
                           ),
                           const SizedBox(width: 12),
                           Column(
@@ -260,7 +310,7 @@ class AdminDashboardScreen extends StatelessWidget {
                           const Text('Total Revenue', style: TextStyle(fontSize: 12, color: Colors.white60)),
                           const SizedBox(height: 4),
                           Text(
-                            '\$${orderProvider.totalRevenue.toStringAsFixed(2)}',
+                            AppConstants.formatCurrency(orderProvider.totalRevenue),
                             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
                           ),
                         ],
@@ -527,30 +577,117 @@ class AdminDashboardScreen extends StatelessWidget {
               ...orderProvider.allOrders.take(3).map((order) => Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppTheme.cardBorder),
                     ),
-                    child: ListTile(
-                      leading: Text(order.status.emoji, style: const TextStyle(fontSize: 22)),
-                      title: Text(
-                        'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8) : order.id}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      subtitle: Text('${order.items.length} items • \$${order.grandTotal.toStringAsFixed(2)}'),
-                      trailing: Text(
-                        order.status.label,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primaryColor),
-                      ),
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminOrdersScreen()),
+                    child: Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        leading: Text(order.status.emoji, style: const TextStyle(fontSize: 22)),
+                        title: Text(
+                          'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8) : order.id}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        subtitle: Text('${order.items.length} items • ${AppConstants.formatCurrency(order.grandTotal)}'),
+                        trailing: Text(
+                          order.status.label,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppTheme.primaryColor),
+                        ),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AdminOrdersScreen()),
+                        ),
                       ),
                     ),
                   )),
             const SizedBox(height: 20),
+            // Admin Profile, Security & Password Section
+            _buildAdminProfileSecurityCard(context, authProvider),
+            const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAdminProfileSecurityCard(BuildContext context, AuthProvider auth) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.shield_outlined, color: AppTheme.primaryColor, size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Admin Profile & Security',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                      ),
+                      Text(
+                        'Manage admin credentials, avatar & password',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.badge_outlined, color: AppTheme.primaryColor),
+            title: const Text('Edit Admin Profile', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: Text(
+              '${auth.displayName} • ${auth.phone.isNotEmpty ? auth.phone : 'No phone set'}',
+              style: const TextStyle(fontSize: 12),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+            onTap: () => ProfileManagementDialogs.showEditProfileDialog(context, auth),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.photo_camera_rounded, color: Colors.blue),
+            title: const Text('Update Profile Picture', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: const Text('Change photo from gallery, camera, or URL', style: TextStyle(fontSize: 12)),
+            trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+            onTap: () => ProfileManagementDialogs.showPhotoUploadSheet(context, auth),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
+            leading: const Icon(Icons.lock_reset_rounded, color: Colors.orange),
+            title: const Text('Change Account Password', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: const Text('Update password with current password confirmation', style: TextStyle(fontSize: 12)),
+            trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+            onTap: () => ProfileManagementDialogs.showChangePasswordDialog(context, auth),
+          ),
+        ],
       ),
     );
   }
@@ -849,7 +986,7 @@ class AdminDashboardScreen extends StatelessWidget {
                   ? Image.network(
                       product.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         color: Colors.grey.shade200,
                         child: const Icon(Icons.broken_image_outlined, size: 20, color: Colors.grey),
                       ),
@@ -858,7 +995,7 @@ class AdminDashboardScreen extends StatelessWidget {
                       imageUrl: product.imageUrl,
                       fit: BoxFit.cover,
                       memCacheWidth: 150,
-                      errorWidget: (_, __, ___) => Container(
+                      errorWidget: (_, _, _) => Container(
                         color: Colors.grey.shade200,
                         child: const Icon(Icons.broken_image_outlined, size: 20, color: Colors.grey),
                       ),

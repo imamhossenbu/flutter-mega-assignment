@@ -1,26 +1,29 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/constants/app_constants.dart';
 import '../models/cart_item_model.dart';
+import '../models/order_model.dart';
 import '../models/product_model.dart';
 import '../models/promo_code_model.dart';
-import '../services/firebase_service.dart';
+import '../repositories/promo_repository.dart';
 
 class CartProvider extends ChangeNotifier {
-  String _userId = '';
-  List<CartItemModel> _items = [];
-  bool _isLoading = false;
+  final PromoRepository _promoRepository;
+
+  final List<CartItemModel> _items = [];
+  final bool _isLoading = false;
   String? _appliedPromoCode;
-  double _promoDiscountPercent = 0.0;
+  double _promoDiscountFraction = 0.0;
   PromoCodeModel? _appliedPromo;
   bool _isValidatingPromo = false;
-  StreamSubscription? _subscription;
+  bool _isDhaka = true;
 
   List<CartItemModel> get items => List.unmodifiable(_items);
   bool get isLoading => _isLoading;
   String? get appliedPromoCode => _appliedPromoCode;
-  double get promoDiscountPercent => _promoDiscountPercent;
+  double get promoDiscountPercent => _promoDiscountFraction;
   PromoCodeModel? get appliedPromo => _appliedPromo;
   bool get isValidatingPromo => _isValidatingPromo;
+  bool get isDhaka => _isDhaka;
 
   int get itemCount => _items.length;
   int get totalQuantity => _items.fold(0, (sum, item) => sum + item.quantity);
@@ -28,54 +31,65 @@ class CartProvider extends ChangeNotifier {
   double get subtotal => _items.fold(0.0, (sum, item) => sum + item.totalPrice);
 
   double get discountAmount {
-    if (_promoDiscountPercent <= 0) return 0.0;
-    return (subtotal * _promoDiscountPercent);
+    if (_promoDiscountFraction <= 0) return 0.0;
+    return subtotal * _promoDiscountFraction;
   }
 
-  double get shippingFee {
-    if (subtotal == 0) return 0.0;
-    return subtotal > 150 ? 0.0 : 15.0; // Free shipping over $150
-  }
+  double get deliveryFee =>
+      _items.isEmpty ? 0.0 : (_isDhaka ? AppConstants.deliveryFeeDhaka : AppConstants.deliveryFeeOutsideDhaka);
 
-  double get taxAmount => (subtotal - discountAmount) * 0.05; // 5% tax
+  double get shippingFee => deliveryFee;
+
+  double get taxAmount => (subtotal - discountAmount).clamp(0.0, double.infinity) * AppConstants.taxRate;
 
   double get grandTotal {
     if (subtotal == 0) return 0.0;
-    final total = (subtotal - discountAmount) + shippingFee + taxAmount;
-    return total > 0 ? total : 0.0;
+    final discounted = (subtotal - discountAmount).clamp(0.0, double.infinity);
+    return discounted + taxAmount + deliveryFee;
+  }
+
+  CartProvider({PromoRepository? promoRepository, bool seedSample = false})
+      : _promoRepository = promoRepository ?? FirestorePromoRepository() {
+    if (seedSample) {
+      _initSampleCart();
+    }
+  }
+
+  void _initSampleCart() {
+    if (AppConstants.initialProducts.length >= 2) {
+      final p1 = AppConstants.initialProducts[0];
+      final p2 = AppConstants.initialProducts[1];
+      _items.addAll([
+        CartItemModel(
+          id: 'cart_item_1',
+          product: p1,
+          quantity: 1,
+          selectedColor: p1.colors.isNotEmpty ? p1.colors.first : 'Black',
+          selectedSize: p1.sizes.isNotEmpty ? p1.sizes.first : 'Standard',
+          addedAt: DateTime.now(),
+        ),
+        CartItemModel(
+          id: 'cart_item_2',
+          product: p2,
+          quantity: 2,
+          selectedColor: p2.colors.isNotEmpty ? p2.colors.first : 'Teal',
+          selectedSize: p2.sizes.isNotEmpty ? p2.sizes.first : 'Standard',
+          addedAt: DateTime.now(),
+        ),
+      ]);
+      _appliedPromoCode = 'MEGA20';
+      _promoDiscountFraction = 0.20;
+    }
+  }
+
+  void setDeliveryZone({required bool isDhaka}) {
+    if (_isDhaka == isDhaka) return;
+    _isDhaka = isDhaka;
+    notifyListeners();
   }
 
   void updateUserId(String newUserId) {
-    if (_userId == newUserId) return;
-    _userId = newUserId;
-    _listenToCartStream();
-  }
-
-  void _listenToCartStream() {
-    _subscription?.cancel();
-    if (_userId.isEmpty) return;
-
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      _subscription = FirebaseService.instance.streamCart(_userId).listen(
-        (cartList) {
-          _items = cartList;
-          _isLoading = false;
-          notifyListeners();
-        },
-        onError: (e) {
-          debugPrint('Firestore cart stream error: $e');
-          _isLoading = false;
-          notifyListeners();
-        },
-      );
-    } catch (e) {
-      debugPrint('Error starting cart stream: $e');
-      _isLoading = false;
-      notifyListeners();
-    }
+    // Session tracking if needed
   }
 
   Future<void> addToCart(
@@ -87,7 +101,6 @@ class CartProvider extends ChangeNotifier {
     final effectiveColor = selectedColor ?? (product.colors.isNotEmpty ? product.colors.first : null);
     final effectiveSize = selectedSize ?? (product.sizes.isNotEmpty ? product.sizes.first : null);
 
-    // Optimistic local update
     final existingIndex = _items.indexWhere(
       (item) =>
           item.product.id == product.id &&
@@ -116,19 +129,6 @@ class CartProvider extends ChangeNotifier {
       _items.insert(0, newItem);
     }
     notifyListeners();
-
-    // Firebase Firestore sync
-    if (_userId.isNotEmpty) {
-      final itemToSync = CartItemModel(
-        id: cartItemId,
-        product: product,
-        quantity: quantity,
-        selectedColor: effectiveColor,
-        selectedSize: effectiveSize,
-        addedAt: DateTime.now(),
-      );
-      await FirebaseService.instance.addToCart(_userId, itemToSync);
-    }
   }
 
   Future<void> updateQuantity(String cartItemId, int newQuantity) async {
@@ -141,60 +141,33 @@ class CartProvider extends ChangeNotifier {
       _items[index] = _items[index].copyWith(quantity: newQuantity);
     }
     notifyListeners();
-
-    // Firebase Firestore sync
-    if (_userId.isNotEmpty) {
-      await FirebaseService.instance.updateCartQuantity(_userId, cartItemId, newQuantity);
-    }
   }
 
   Future<void> removeItem(String cartItemId) async {
     _items.removeWhere((item) => item.id == cartItemId);
     notifyListeners();
-
-    // Firebase Firestore sync
-    if (_userId.isNotEmpty) {
-      await FirebaseService.instance.removeFromCart(_userId, cartItemId);
-    }
   }
 
   Future<void> clearCart() async {
     _items.clear();
     _appliedPromoCode = null;
-    _promoDiscountPercent = 0.0;
+    _promoDiscountFraction = 0.0;
+    _appliedPromo = null;
     notifyListeners();
-
-    // Firebase Firestore sync
-    if (_userId.isNotEmpty) {
-      await FirebaseService.instance.clearCart(_userId);
-    }
   }
 
   Future<bool> applyPromoCode(String code) async {
+    final clean = code.trim().toUpperCase();
+    if (clean.isEmpty) return false;
+
     _isValidatingPromo = true;
     notifyListeners();
     try {
-      // Validate against Firestore first
-      final promo = await FirebaseService.instance.validatePromoCode(code);
+      final promo = await _promoRepository.validatePromoCode(clean, subtotal);
       if (promo != null) {
         _appliedPromo = promo;
         _appliedPromoCode = promo.code;
-        _promoDiscountPercent = promo.discountPercent;
-        _isValidatingPromo = false;
-        notifyListeners();
-        return true;
-      }
-      // Fallback: hardcoded codes
-      final normalized = code.trim().toUpperCase();
-      if (normalized == 'MEGA20' || normalized == 'SAVE20') {
-        _appliedPromoCode = normalized;
-        _promoDiscountPercent = 0.20;
-        _isValidatingPromo = false;
-        notifyListeners();
-        return true;
-      } else if (normalized == 'WELCOME10') {
-        _appliedPromoCode = normalized;
-        _promoDiscountPercent = 0.10;
+        _promoDiscountFraction = promo.discountFraction;
         _isValidatingPromo = false;
         notifyListeners();
         return true;
@@ -202,7 +175,7 @@ class CartProvider extends ChangeNotifier {
       _isValidatingPromo = false;
       notifyListeners();
       return false;
-    } catch (e) {
+    } catch (_) {
       _isValidatingPromo = false;
       notifyListeners();
       return false;
@@ -211,14 +184,21 @@ class CartProvider extends ChangeNotifier {
 
   void removePromoCode() {
     _appliedPromoCode = null;
-    _promoDiscountPercent = 0.0;
+    _promoDiscountFraction = 0.0;
     _appliedPromo = null;
     notifyListeners();
   }
 
-  @override
-  void dispose() {
-    _subscription?.cancel();
-    super.dispose();
+  List<OrderItemModel> toOrderSnapshotItems() {
+    return _items.map((item) => OrderItemModel(
+      productId: item.product.id,
+      name: item.product.name,
+      price: item.product.price,
+      imageUrl: item.product.imageUrl,
+      unit: item.product.unit,
+      selectedColor: item.selectedColor,
+      selectedSize: item.selectedSize,
+      quantity: item.quantity,
+    )).toList();
   }
 }

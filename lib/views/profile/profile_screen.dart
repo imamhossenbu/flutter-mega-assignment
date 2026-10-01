@@ -1,9 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/app_toast.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/wishlist_provider.dart';
@@ -15,52 +13,7 @@ class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   Future<void> _pickAndUploadPhoto(BuildContext context, AuthProvider auth) async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Update Profile Picture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: AppTheme.primaryColor),
-                title: const Text('Choose from Gallery'),
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primaryColor),
-                title: const Text('Take a Photo'),
-                onTap: () => Navigator.pop(ctx, ImageSource.camera),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (source != null && context.mounted) {
-      AppToast.showInfo(context, 'Uploading profile photo... ⏳', title: 'Uploading');
-      final url = await auth.uploadProfileImage(source: source);
-      if (context.mounted) {
-        if (url != null) {
-          AppToast.showSuccess(
-            context,
-            'Profile picture updated successfully! ✨',
-            title: 'Profile Updated',
-          );
-        } else {
-          AppToast.showError(
-            context,
-            'Failed to upload picture. Please try again.',
-            title: 'Upload Failed',
-          );
-        }
-      }
-    }
+    await ProfileManagementDialogs.showPhotoUploadSheet(context, auth);
   }
 
   @override
@@ -320,12 +273,14 @@ class ProfileScreen extends StatelessWidget {
             // Sign Out
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: AppTheme.cardBorder),
               ),
-              child: ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 leading: Container(
                   width: 38,
                   height: 38,
@@ -362,6 +317,7 @@ class ProfileScreen extends StatelessWidget {
                 },
               ),
             ),
+          ),
           ],
         ),
       ),

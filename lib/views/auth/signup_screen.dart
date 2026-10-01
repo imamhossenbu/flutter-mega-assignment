@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../admin/admin_main_screen.dart';
@@ -17,6 +18,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
@@ -26,6 +28,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -53,6 +56,7 @@ class _SignupScreenState extends State<SignupScreen> {
       _emailController.text,
       _passwordController.text,
       _nameController.text,
+      _phoneController.text,
     );
     if (success && mounted) {
       _routeAfterAuth(auth);
@@ -194,6 +198,24 @@ class _SignupScreenState extends State<SignupScreen> {
                         if (v == null || v.trim().isEmpty) return 'Email is required';
                         final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
                         if (!emailRegex.hasMatch(v.trim())) return 'Please enter a valid email address';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number (e.g. 01712345678) *',
+                        hintText: '01XXXXXXXXX',
+                        prefixIcon: Icon(Icons.phone_outlined),
+                        helperText: 'Mandatory 11-digit Bangladeshi mobile number',
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Phone number is mandatory';
+                        if (!AppConstants.isValidPhone(v)) {
+                          return 'Enter a valid 11-digit BD number (01XXXXXXXXX)';
+                        }
                         return null;
                       },
                     ),

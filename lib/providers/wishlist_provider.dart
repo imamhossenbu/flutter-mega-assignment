@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../core/constants/app_constants.dart';
 import '../models/product_model.dart';
-import '../services/firebase_service.dart';
+import '../repositories/product_repository.dart';
 
 class WishlistProvider extends ChangeNotifier {
+  final ProductRepository _productRepository;
+
   String _userId = '';
   final Map<String, ProductModel> _wishlistMap = {};
   bool _isLoading = false;
@@ -15,6 +18,20 @@ class WishlistProvider extends ChangeNotifier {
 
   bool isInWishlist(String productId) => _wishlistMap.containsKey(productId);
 
+  WishlistProvider({ProductRepository? productRepository})
+      : _productRepository = productRepository ?? FirestoreProductRepository() {
+    _initSampleWishlist();
+  }
+
+  void _initSampleWishlist() {
+    if (AppConstants.initialProducts.length >= 4) {
+      final p1 = AppConstants.initialProducts[2];
+      final p2 = AppConstants.initialProducts[3];
+      _wishlistMap[p1.id] = p1;
+      _wishlistMap[p2.id] = p2;
+    }
+  }
+
   void updateUserId(String newUserId) {
     if (_userId == newUserId) return;
     _userId = newUserId;
@@ -23,13 +40,17 @@ class WishlistProvider extends ChangeNotifier {
 
   void _listenToWishlistStream() {
     _subscription?.cancel();
-    if (_userId.isEmpty) return;
+    if (_userId.isEmpty) {
+      _wishlistMap.clear();
+      notifyListeners();
+      return;
+    }
 
     _isLoading = true;
     notifyListeners();
 
     try {
-      _subscription = FirebaseService.instance.streamWishlist(_userId).listen(
+      _subscription = _productRepository.streamWishlist(_userId).listen(
         (items) {
           _wishlistMap.clear();
           for (final item in items) {
@@ -39,7 +60,7 @@ class WishlistProvider extends ChangeNotifier {
           notifyListeners();
         },
         onError: (e) {
-          debugPrint('Firestore wishlist stream error: $e');
+          debugPrint('Wishlist stream error: $e');
           _isLoading = false;
           notifyListeners();
         },
@@ -62,24 +83,26 @@ class WishlistProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    // Firestore sync
     if (_userId.isNotEmpty) {
-      if (exists) {
-        await FirebaseService.instance.removeFromWishlist(_userId, product.id);
-      } else {
-        await FirebaseService.instance.addToWishlist(_userId, product);
+      try {
+        await _productRepository.toggleWishlist(_userId, product);
+      } catch (e) {
+        debugPrint('Toggle wishlist error: $e');
+        // Revert on error
+        if (exists) {
+          _wishlistMap[product.id] = product;
+        } else {
+          _wishlistMap.remove(product.id);
+        }
+        notifyListeners();
       }
     }
   }
 
   Future<void> removeFromWishlist(String productId) async {
-    if (!_wishlistMap.containsKey(productId)) return;
-
-    _wishlistMap.remove(productId);
-    notifyListeners();
-
-    if (_userId.isNotEmpty) {
-      await FirebaseService.instance.removeFromWishlist(_userId, productId);
+    final item = _wishlistMap[productId];
+    if (item != null) {
+      await toggleWishlist(item);
     }
   }
 

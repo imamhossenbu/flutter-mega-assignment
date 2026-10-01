@@ -1,16 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/widgets/app_toast.dart';
 import '../../models/order_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../admin/admin_main_screen.dart';
-import '../auth/login_screen.dart';
 import '../orders/orders_screen.dart';
 import '../profile/widgets/profile_management_dialogs.dart';
 
@@ -32,115 +30,16 @@ class CustomerDashboardScreen extends StatefulWidget {
 
 class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   Future<void> _pickAndUploadPhoto(BuildContext context, AuthProvider auth) async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Update Profile Picture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: AppTheme.primaryColor),
-                title: const Text('Choose from Gallery'),
-                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-              ),
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primaryColor),
-                title: const Text('Take a Photo'),
-                onTap: () => Navigator.pop(ctx, ImageSource.camera),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (source != null && context.mounted) {
-      AppToast.showInfo(context, 'Uploading profile photo... ⏳', title: 'Uploading');
-      final url = await auth.uploadProfileImage(source: source);
-      if (context.mounted) {
-        if (url != null) {
-          AppToast.showSuccess(
-            context,
-            'Profile picture updated successfully! ✨',
-            title: 'Profile Updated',
-          );
-        } else {
-          AppToast.showError(
-            context,
-            'Failed to upload picture. Please try again.',
-            title: 'Upload Failed',
-          );
-        }
-      }
-    }
+    await ProfileManagementDialogs.showPhotoUploadSheet(context, auth);
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    if (auth.isGuest) {
-      return _buildGuestDashboard(context);
-    }
     return _buildAuthenticatedCustomerDashboard(context, auth);
   }
 
-  Widget _buildGuestDashboard(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: const Text('Customer Dashboard'),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.person_outline_rounded, size: 48, color: AppTheme.primaryColor),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Welcome to MegaStore',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sign in or sign up with Google or Email to unlock your Customer Dashboard, order tracking, and account management.',
-                style: TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.4),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  ),
-                  icon: const Icon(Icons.login_rounded),
-                  label: const Text('Sign In to Account', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildAuthenticatedCustomerDashboard(BuildContext context, AuthProvider auth) {
     final orderProvider = context.watch<OrderProvider>();
@@ -405,7 +304,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             icon: Icons.monetization_on_rounded,
             iconColor: Colors.green.shade600,
             title: 'Total Spent',
-            value: '\$${orderProvider.totalSpent.toStringAsFixed(0)}',
+            value: AppConstants.formatCurrency(orderProvider.totalSpent),
             subtitle: '${orderProvider.ordersCount} orders',
           ),
         ),
@@ -548,7 +447,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => const Icon(Icons.image),
+                    errorWidget: (_, _, _) => const Icon(Icons.image),
                   ),
                 ),
               const SizedBox(width: 12),
@@ -563,7 +462,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      '${order.items.length} items • \$${order.grandTotal.toStringAsFixed(2)}',
+                      '${order.items.length} items • ${AppConstants.formatCurrency(order.grandTotal)}',
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                     ),
                   ],
@@ -586,7 +485,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     switch (status) {
       case OrderStatus.pending:
         return 1;
-      case OrderStatus.confirmed:
+      case OrderStatus.processing:
         return 2;
       case OrderStatus.shipped:
         return 3;
@@ -682,30 +581,34 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               decoration: BoxDecoration(
-                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.cardBorder),
               ),
-              child: ListTile(
-                leading: Text(order.status.emoji, style: const TextStyle(fontSize: 22)),
-                title: Text(
-                  'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8) : order.id}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                subtitle: Text('${order.items.length} items • \$${order.grandTotal.toStringAsFixed(2)}'),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(8),
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  leading: Text(order.status.emoji, style: const TextStyle(fontSize: 22)),
+                  title: Text(
+                    'Order #${order.id.length > 8 ? order.id.substring(order.id.length - 8) : order.id}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
-                  child: Text(
-                    order.status.label,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                  subtitle: Text('${order.items.length} items • ${AppConstants.formatCurrency(order.grandTotal)}'),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      order.status.label,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                    ),
                   ),
-                ),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                  ),
                 ),
               ),
             );
@@ -780,47 +683,52 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   Widget _buildSignOutTile(BuildContext context, AuthProvider auth) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppTheme.cardBorder),
       ),
-      child: ListTile(
-        leading: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: AppTheme.error.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.logout_rounded, color: AppTheme.error, size: 20),
-        ),
-        title: const Text(
-          'Sign Out',
-          style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.error, size: 20),
-        onTap: () async {
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Sign Out'),
-              content: const Text('Are you sure you want to sign out from your account?'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-                  child: const Text('Sign Out'),
-                ),
-              ],
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          leading: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppTheme.error.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
-          );
-          if (confirmed == true) {
-            await auth.signOut();
-          }
-        },
+            child: const Icon(Icons.logout_rounded, color: AppTheme.error, size: 20),
+          ),
+          title: const Text(
+            'Sign Out',
+            style: TextStyle(color: AppTheme.error, fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.error, size: 20),
+          onTap: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Sign Out'),
+                content: const Text('Are you sure you want to sign out from your account?'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+                    child: const Text('Sign Out'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              await auth.signOut();
+            }
+          },
+        ),
       ),
     );
   }
 
 }
+

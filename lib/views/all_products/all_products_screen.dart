@@ -38,7 +38,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
   SortOption _sortBy = SortOption.featured;
   bool _onlyInStock = false;
   double _minRating = 0.0;
-  RangeValues _priceRange = const RangeValues(0, 2000);
+  RangeValues _priceRange = const RangeValues(0, 100000);
 
   @override
   void initState() {
@@ -70,7 +70,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
       _sortBy = SortOption.featured;
       _onlyInStock = false;
       _minRating = 0.0;
-      _priceRange = const RangeValues(0, 2000);
+      _priceRange = const RangeValues(0, 100000);
     });
   }
 
@@ -79,7 +79,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
     if (_selectedCategory != 'All') count++;
     if (_onlyInStock) count++;
     if (_minRating > 0) count++;
-    if (_priceRange.start > 0 || _priceRange.end < 2000) count++;
+    if (_priceRange.start > 0 || _priceRange.end < 100000) count++;
     if (_sortBy != SortOption.featured) count++;
     return count;
   }
@@ -196,6 +196,9 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                               )
                             : null,
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         isDense: true,
                       ),
@@ -265,7 +268,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               scrollDirection: Axis.horizontal,
               itemCount: AppConstants.categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
                 final cat = AppConstants.categories[index];
                 final isSelected = cat.id == _selectedCategory;
@@ -425,10 +428,10 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                         label: '★ $_minRating+',
                         onRemove: () => setState(() => _minRating = 0.0),
                       ),
-                    if (_priceRange.start > 0 || _priceRange.end < 2000)
+                    if (_priceRange.start > 0 || _priceRange.end < 100000)
                       _buildActiveFilterChip(
-                        label: '\$${_priceRange.start.toInt()} - \$${_priceRange.end.toInt()}',
-                        onRemove: () => setState(() => _priceRange = const RangeValues(0, 2000)),
+                        label: '${AppConstants.formatCurrency(_priceRange.start)} - ${AppConstants.formatCurrency(_priceRange.end)}',
+                        onRemove: () => setState(() => _priceRange = const RangeValues(0, 100000)),
                       ),
                     InkWell(
                       onTap: _resetAllFilters,
@@ -575,7 +578,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                             _selectedCategory = 'All';
                             _onlyInStock = false;
                             _minRating = 0.0;
-                            _priceRange = const RangeValues(0, 2000);
+                            _priceRange = const RangeValues(0, 100000);
                           });
                         },
                         child: const Text('Reset', style: TextStyle(color: AppTheme.error)),
@@ -589,17 +592,17 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Price Range', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('\$${_priceRange.start.toInt()} - \$${_priceRange.end.toInt()}',
+                      Text('${AppConstants.formatCurrency(_priceRange.start)} - ${AppConstants.formatCurrency(_priceRange.end)}',
                           style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.primaryColor)),
                     ],
                   ),
                   RangeSlider(
                     values: _priceRange,
                     min: 0,
-                    max: 2000,
-                    divisions: 40,
+                    max: 100000,
+                    divisions: 50,
                     activeColor: AppTheme.primaryColor,
-                    labels: RangeLabels('\$${_priceRange.start.toInt()}', '\$${_priceRange.end.toInt()}'),
+                    labels: RangeLabels(AppConstants.formatCurrency(_priceRange.start), AppConstants.formatCurrency(_priceRange.end)),
                     onChanged: (values) => setModalState(() => _priceRange = values),
                   ),
                   const SizedBox(height: 14),
@@ -613,6 +616,7 @@ class _AllProductsScreenState extends State<AllProductsScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
+                          showCheckmark: false,
                           label: Text(rating == 0 ? 'All' : '★ $rating+'),
                           selected: isSelected,
                           selectedColor: AppTheme.primaryColor.withOpacity(0.15),

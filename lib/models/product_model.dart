@@ -16,6 +16,7 @@ class ProductModel {
   final int stockCount;
   final String unit; // 'pcs', 'ml', 'L', 'g', 'kg', 'pack', 'pair', 'box'
   final String? unitSize; // e.g., '250' for 250ml or '500' for 500g
+  final bool isDeleted;
 
   const ProductModel({
     required this.id,
@@ -35,6 +36,7 @@ class ProductModel {
     this.stockCount = 10,
     this.unit = 'pcs',
     this.unitSize,
+    this.isDeleted = false,
   });
 
   double get discountPercent {
@@ -70,6 +72,7 @@ class ProductModel {
       'stockCount': stockCount,
       'unit': unit,
       'unitSize': unitSize,
+      'isDeleted': isDeleted,
     };
   }
 
@@ -92,6 +95,7 @@ class ProductModel {
       stockCount: (map['stockCount'] as num?)?.toInt() ?? 10,
       unit: map['unit'] as String? ?? 'pcs',
       unitSize: map['unitSize'] as String?,
+      isDeleted: map['isDeleted'] as bool? ?? false,
     );
   }
 
@@ -113,6 +117,7 @@ class ProductModel {
     int? stockCount,
     String? unit,
     String? unitSize,
+    bool? isDeleted,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -132,6 +137,7 @@ class ProductModel {
       stockCount: stockCount ?? this.stockCount,
       unit: unit ?? this.unit,
       unitSize: unitSize ?? this.unitSize,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

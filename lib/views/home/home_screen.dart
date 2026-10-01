@@ -244,6 +244,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                         ),
@@ -317,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                         scrollDirection: Axis.horizontal,
                         itemCount: dynamicCats.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        separatorBuilder: (_, _) => const SizedBox(width: 12),
                         itemBuilder: (context, index) {
                           final catName = dynamicCats[index];
                           return InkWell(
@@ -388,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
                       itemCount: featuredProducts.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
                       itemBuilder: (context, index) => ProductCard(
                         product: featuredProducts[index],
                         width: 175,
@@ -416,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
                       itemCount: deals.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
                       itemBuilder: (context, index) => ProductCard(
                         product: deals[index],
                         width: 175,
@@ -445,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
                       itemCount: topRated.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
                       itemBuilder: (context, index) => ProductCard(
                         product: topRated[index],
                         width: 175,

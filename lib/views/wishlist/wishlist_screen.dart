@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../providers/cart_provider.dart';
@@ -147,7 +148,7 @@ class WishlistScreen extends StatelessWidget {
                                   Row(
                                     children: [
                                       Text(
-                                        '\$${product.price.toStringAsFixed(2)}',
+                                        AppConstants.formatCurrency(product.price),
                                         style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w800,
@@ -157,7 +158,7 @@ class WishlistScreen extends StatelessWidget {
                                       if (product.originalPrice > product.price) ...[
                                         const SizedBox(width: 6),
                                         Text(
-                                          '\$${product.originalPrice.toStringAsFixed(2)}',
+                                          AppConstants.formatCurrency(product.originalPrice),
                                           style: const TextStyle(
                                             fontSize: 12,
                                             decoration: TextDecoration.lineThrough,

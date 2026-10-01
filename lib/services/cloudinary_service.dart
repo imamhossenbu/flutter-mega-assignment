@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
@@ -8,18 +8,33 @@ class CloudinaryService {
   static final CloudinaryService instance = CloudinaryService._();
   CloudinaryService._();
 
-  // Cloudinary credentials provided by user
-  String apiKey = '399642892931915';
-  String apiSecret = 'hrVuS2NKSi309VgGp_RJ2rwwjug';
-  String cloudName = 'imamhossenbu';
-  String uploadPreset = 'flutter_upload';
+  String? _cloudNameOverride;
+  String? _uploadPresetOverride;
 
-  void configure({String? newCloudName, String? newApiKey, String? newApiSecret, String? newPreset}) {
-    if (newCloudName != null && newCloudName.isNotEmpty) cloudName = newCloudName.trim();
-    if (newApiKey != null && newApiKey.isNotEmpty) apiKey = newApiKey.trim();
-    if (newApiSecret != null && newApiSecret.isNotEmpty) apiSecret = newApiSecret.trim();
-    if (newPreset != null && newPreset.isNotEmpty) uploadPreset = newPreset.trim();
+  String get cloudName => _cloudNameOverride ?? dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
+  String get uploadPreset => _uploadPresetOverride ?? dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
+
+  void configure({String? newCloudName, String? newPreset}) {
+    if (newCloudName != null && newCloudName.isNotEmpty) _cloudNameOverride = newCloudName.trim();
+    if (newPreset != null && newPreset.isNotEmpty) _uploadPresetOverride = newPreset.trim();
   }
+
+  /// Injects Cloudinary optimization transformations into URL.
+  /// Defaults to w_400 for thumbnails, w_800 for details.
+  static String transformUrl(String? url, {String transformation = 'w_400,q_auto,f_auto'}) {
+    if (url == null || url.trim().isEmpty) return '';
+    final trimmed = url.trim();
+    if (!trimmed.contains('cloudinary.com') || !trimmed.contains('/upload/')) {
+      return trimmed;
+    }
+    if (trimmed.contains('/upload/$transformation/')) {
+      return trimmed;
+    }
+    return trimmed.replaceFirst('/upload/', '/upload/$transformation/');
+  }
+
+  static String thumbnail(String? url) => transformUrl(url, transformation: 'w_400,q_auto,f_auto');
+  static String detail(String? url) => transformUrl(url, transformation: 'w_800,q_auto,f_auto');
 
   /// Picks an image from Gallery or Camera and returns XFile
   Future<XFile?> pickImage({ImageSource source = ImageSource.gallery}) async {
@@ -38,65 +53,21 @@ class CloudinaryService {
     }
   }
 
-  /// Uploads raw image bytes to Cloudinary using signed authentication
+  /// Uploads raw image bytes to Cloudinary using Unsigned Upload with preset
   Future<String?> uploadImageBytes(Uint8List bytes, {String filename = 'product.jpg'}) async {
-    if (cloudName.isEmpty) {
-      throw Exception('Cloudinary Cloud Name is required.');
+    final cName = cloudName;
+    final preset = uploadPreset;
+
+    if (cName.isEmpty || preset.isEmpty) {
+      throw Exception(
+        'Cloudinary is not configured. Please ensure CLOUDINARY_CLOUD_NAME and '
+        'CLOUDINARY_UPLOAD_PRESET are set in your .env file.',
+      );
     }
 
-    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
-    final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
-
-    // 1. Try Signed Upload with API Key & Secret
-    try {
-      // Cloudinary signature formula: SHA1(sorted_params + api_secret)
-      final signaturePayload = 'timestamp=$timestamp$apiSecret';
-      final signature = sha1.convert(utf8.encode(signaturePayload)).toString();
-
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['api_key'] = apiKey
-        ..fields['timestamp'] = timestamp
-        ..fields['signature'] = signature
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            bytes,
-            filename: filename,
-          ),
-        );
-
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final secureUrl = data['secure_url'] as String?;
-        if (secureUrl != null && secureUrl.isNotEmpty) {
-          debugPrint('Cloudinary upload success: $secureUrl');
-          return secureUrl;
-        }
-      }
-
-      debugPrint('Signed upload response [${response.statusCode}]: ${response.body}');
-
-      // If signed upload failed (e.g. signature error or preset needed), try unsigned as fallback
-      if (uploadPreset.isNotEmpty) {
-        return await _uploadUnsigned(bytes, filename: filename);
-      } else {
-        final data = json.decode(response.body);
-        final errorMsg = data['error']?['message'] ?? 'Cloudinary upload failed: ${response.statusCode}';
-        throw Exception(errorMsg);
-      }
-    } catch (e) {
-      debugPrint('Cloudinary upload exception: $e');
-      rethrow;
-    }
-  }
-
-  Future<String?> _uploadUnsigned(Uint8List bytes, {required String filename}) async {
-    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
+    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cName/image/upload');
     final request = http.MultipartRequest('POST', uri)
-      ..fields['upload_preset'] = uploadPreset
+      ..fields['upload_preset'] = preset
       ..files.add(
         http.MultipartFile.fromBytes(
           'file',
@@ -105,14 +76,25 @@ class CloudinaryService {
         ),
       );
 
-    final streamedResponse = await request.send();
-    final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      return data['secure_url'] as String?;
+    try {
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final secureUrl = data['secure_url'] as String?;
+        if (secureUrl != null && secureUrl.isNotEmpty) {
+          debugPrint('Cloudinary unsigned upload success: $secureUrl');
+          return secureUrl;
+        }
+      }
+
+      final data = json.decode(response.body);
+      final errorMsg = data['error']?['message'] ?? 'Upload failed with HTTP ${response.statusCode}';
+      throw Exception(errorMsg);
+    } catch (e) {
+      debugPrint('Cloudinary upload exception: $e');
+      rethrow;
     }
-    final data = json.decode(response.body);
-    final errorMsg = data['error']?['message'] ?? 'Upload failed with code ${response.statusCode}';
-    throw Exception(errorMsg);
   }
 }

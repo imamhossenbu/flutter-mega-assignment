@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../models/product_model.dart';
@@ -272,8 +273,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                     : CachedNetworkImage(
                         imageUrl: product.imageUrl,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(color: const Color(0xFFF8FAFC)),
-                        errorWidget: (_, __, ___) => Container(
+                        placeholder: (_, _) => Container(color: const Color(0xFFF8FAFC)),
+                        errorWidget: (_, _, _) => Container(
                           color: const Color(0xFFF1F5F9),
                           child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8), size: 28),
                         ),
@@ -327,13 +328,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                   Row(
                     children: [
                       Text(
-                        '\$${product.price.toStringAsFixed(2)}',
+                        AppConstants.formatCurrency(product.price),
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
                       ),
                       if (product.originalPrice > product.price) ...[
                         const SizedBox(width: 6),
                         Text(
-                          '\$${product.originalPrice.toStringAsFixed(2)}',
+                          AppConstants.formatCurrency(product.originalPrice),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textMuted,

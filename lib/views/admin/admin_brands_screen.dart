@@ -62,56 +62,60 @@ class AdminBrandsScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.cardBorder),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.blue.shade50,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(
-              brand.name.isNotEmpty ? brand.name[0].toUpperCase() : 'B',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: ListTile(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Text(
+                brand.name.isNotEmpty ? brand.name[0].toUpperCase() : 'B',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+              ),
             ),
           ),
-        ),
-        title: Text(
-          brand.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-        ),
-        subtitle: Text(
-          '$productCount products from this brand',
-          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 20),
-          onPressed: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Delete Brand'),
-                content: Text('Are you sure you want to delete brand "${brand.name}"?'),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-                    child: const Text('Delete'),
-                  ),
-                ],
-              ),
-            );
-            if (confirm == true) {
-              await provider.deleteBrand(brand.id);
-            }
-          },
+          title: Text(
+            brand.name,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          subtitle: Text(
+            '$productCount products from this brand',
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 20),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Delete Brand'),
+                  content: Text('Are you sure you want to delete brand "${brand.name}"?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await provider.deleteBrand(brand.id);
+              }
+            },
+          ),
         ),
       ),
     );

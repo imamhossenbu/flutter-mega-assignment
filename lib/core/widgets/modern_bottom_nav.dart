@@ -36,11 +36,14 @@ class ModernBottomNavBar extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
+        border: const Border(
+          top: BorderSide(color: Color(0xFFF1F5F9), width: 1),
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, -6),
+            color: const Color(0xFF0F172A).withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
           ),
         ],
       ),

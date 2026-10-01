@@ -4,26 +4,25 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_toast.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../profile/widgets/profile_management_dialogs.dart';
 
 class AdminCustomersScreen extends StatelessWidget {
   const AdminCustomersScreen({super.key});
 
-  static const String rootAdminEmail = 'admin@megastore.com';
-
-  void _showPurgeDialog(BuildContext context, AdminProvider adminProvider) {
+  void _showPurgeDialog(BuildContext context, AdminProvider adminProvider, String currentUserId) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+            Icon(Icons.warning_amber_rounded, color: AppTheme.warning, size: 28),
             SizedBox(width: 8),
-            Text('Purge All Users?'),
+            Text('Clean Inactive Customers?'),
           ],
         ),
         content: const Text(
-          'This will permanently delete all customer accounts from Firestore except root admin (admin@megastore.com).\n\nAre you sure you want to proceed?',
+          'This will delete customer accounts while preserving all admin users and your active session.\n\nAre you sure you want to proceed?',
           style: TextStyle(fontSize: 14),
         ),
         actions: [
@@ -33,7 +32,7 @@ class AdminCustomersScreen extends StatelessWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+              backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
@@ -43,12 +42,12 @@ class AdminCustomersScreen extends StatelessWidget {
               if (context.mounted) {
                 AppToast.showSuccess(
                   context,
-                  'Successfully deleted $deleted test user accounts. Root admin preserved!',
-                  title: 'Users Purged',
+                  'Cleared $deleted customer accounts. Admin accounts preserved.',
+                  title: 'Users Cleaned',
                 );
               }
             },
-            child: const Text('Purge Users'),
+            child: const Text('Confirm'),
           ),
         ],
       ),
@@ -61,7 +60,7 @@ class AdminCustomersScreen extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Delete User Account'),
-        content: Text('Are you sure you want to delete "$name"? This action cannot be reversed.'),
+        content: Text('Are you sure you want to delete account "$name"? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -69,7 +68,7 @@ class AdminCustomersScreen extends StatelessWidget {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
+              backgroundColor: AppTheme.error,
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
@@ -98,8 +97,7 @@ class AdminCustomersScreen extends StatelessWidget {
 
     final adminCount = users.where((u) {
       final role = (u['role'] as String? ?? '').toLowerCase();
-      final email = (u['email'] as String? ?? '').trim().toLowerCase();
-      return role == 'admin' || email == rootAdminEmail;
+      return role == 'admin';
     }).length;
 
     final customerCount = users.length - adminCount;
@@ -110,9 +108,9 @@ class AdminCustomersScreen extends StatelessWidget {
         title: const Text('Users & Role Management'),
         actions: [
           IconButton(
-            tooltip: 'Purge all users except root admin',
-            icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent),
-            onPressed: () => _showPurgeDialog(context, adminProvider),
+            tooltip: 'Clean inactive customer accounts',
+            icon: const Icon(Icons.cleaning_services_rounded, color: AppTheme.primaryColor),
+            onPressed: () => _showPurgeDialog(context, adminProvider, authProvider.userId),
           ),
         ],
       ),
@@ -128,11 +126,11 @@ class AdminCustomersScreen extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryColor.withOpacity(0.25),
-                  blurRadius: 10,
+                  color: AppTheme.primaryColor.withOpacity(0.22),
+                  blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
               ],
@@ -168,31 +166,35 @@ class AdminCustomersScreen extends StatelessWidget {
                     itemCount: users.length,
                     itemBuilder: (context, index) {
                       final user = users[index];
-                      final uid = user['id'] as String? ?? '';
+                      final uid = user['id'] as String? ?? user['uid'] as String? ?? '';
                       final name = user['name'] as String? ?? 'Shopper';
                       final email = (user['email'] as String? ?? 'No email').trim();
-                      final isRootAdmin = email.toLowerCase() == rootAdminEmail;
-                      final role = isRootAdmin ? 'admin' : (user['role'] as String? ?? 'customer');
+                      final phone = (user['phone'] as String? ?? '').trim();
+                      final role = (user['role'] as String? ?? 'customer').toLowerCase();
                       final isAdmin = role == 'admin';
-                      final isCurrent = uid == authProvider.userId;
+                      final isCurrent = uid.isNotEmpty && uid == authProvider.userId;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: isCurrent
+                                ? AppTheme.primaryColor.withOpacity(0.3)
+                                : AppTheme.cardBorder,
+                            width: isCurrent ? 1.5 : 1.0,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: isRootAdmin
-                                  ? AppTheme.primaryColor.withOpacity(0.08)
-                                  : Colors.black.withOpacity(0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
+                              color: const Color(0xFF0F172A).withOpacity(0.03),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -201,12 +203,16 @@ class AdminCustomersScreen extends StatelessWidget {
                                   CircleAvatar(
                                     radius: 22,
                                     backgroundColor: isAdmin
-                                        ? AppTheme.primaryColor
-                                        : Colors.grey.shade200,
-                                    foregroundColor: isAdmin ? Colors.white : AppTheme.textPrimary,
+                                        ? AppTheme.primaryColor.withOpacity(0.12)
+                                        : const Color(0xFFF1F5F9),
+                                    foregroundColor: isAdmin ? AppTheme.primaryColor : AppTheme.textPrimary,
                                     child: Text(
                                       name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: isAdmin ? AppTheme.primaryColor : AppTheme.textPrimary,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -222,6 +228,7 @@ class AdminCustomersScreen extends StatelessWidget {
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 15,
+                                                  color: AppTheme.textPrimary,
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -231,10 +238,17 @@ class AdminCustomersScreen extends StatelessWidget {
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.grey.shade100,
+                                                  color: AppTheme.primaryColor.withOpacity(0.1),
                                                   borderRadius: BorderRadius.circular(6),
                                                 ),
-                                                child: const Text('You', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.textMuted)),
+                                                child: const Text(
+                                                  'YOU',
+                                                  style: TextStyle(
+                                                    color: AppTheme.primaryColor,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                               ),
                                             ],
                                           ],
@@ -243,29 +257,33 @@ class AdminCustomersScreen extends StatelessWidget {
                                         Text(
                                           email,
                                           style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                          maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
+                                        if (phone.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            phone,
+                                            style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
-                                  // Role Badge
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: isRootAdmin
-                                          ? Colors.amber.shade100
-                                          : (isAdmin ? AppTheme.primaryColor.withOpacity(0.12) : Colors.grey.shade100),
-                                      borderRadius: BorderRadius.circular(8),
+                                      color: isAdmin
+                                          ? AppTheme.primaryColor.withOpacity(0.1)
+                                          : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
-                                      isRootAdmin ? 'ROOT ADMIN' : (isAdmin ? 'ADMIN' : 'CUSTOMER'),
+                                      isAdmin ? 'Admin' : 'Customer',
                                       style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.5,
-                                        color: isRootAdmin
-                                            ? Colors.amber.shade900
-                                            : (isAdmin ? AppTheme.primaryColor : AppTheme.textSecondary),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isAdmin ? AppTheme.primaryColor : AppTheme.textSecondary,
                                       ),
                                     ),
                                   ),
@@ -283,14 +301,14 @@ class AdminCustomersScreen extends StatelessWidget {
                                       const Icon(Icons.security_rounded, size: 16, color: AppTheme.textMuted),
                                       const SizedBox(width: 6),
                                       Text(
-                                        'Role: ${isAdmin ? 'Admin' : 'Customer'}',
-                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                                        'Access: ${isAdmin ? 'Administrator' : 'Customer'}',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                                       ),
                                     ],
                                   ),
                                   Row(
                                     children: [
-                                      if (!isRootAdmin) ...[
+                                      if (!isCurrent) ...[
                                         // Quick Role Toggle Button
                                         ElevatedButton.icon(
                                           style: ElevatedButton.styleFrom(
@@ -299,7 +317,7 @@ class AdminCustomersScreen extends StatelessWidget {
                                             backgroundColor: isAdmin ? const Color(0xFFFFF7ED) : AppTheme.primaryColor.withOpacity(0.1),
                                             foregroundColor: isAdmin ? Colors.deepOrange : AppTheme.primaryColor,
                                             elevation: 0,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                           ),
                                           icon: Icon(
                                             isAdmin ? Icons.person_outline : Icons.admin_panel_settings_outlined,
@@ -326,34 +344,42 @@ class AdminCustomersScreen extends StatelessWidget {
                                             }
                                           },
                                         ),
-                                        const SizedBox(width: 8),
+                                        const SizedBox(width: 6),
                                         // Delete Button
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                          icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 20),
                                           tooltip: 'Delete User',
                                           visualDensity: VisualDensity.compact,
                                           onPressed: () => _confirmDeleteUser(context, adminProvider, uid, name),
                                         ),
-                                       ] else ...[
-                                         Container(
-                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                           decoration: BoxDecoration(
-                                             color: Colors.amber.shade50,
-                                             borderRadius: BorderRadius.circular(8),
-                                           ),
-                                           child: Row(
-                                             mainAxisSize: MainAxisSize.min,
-                                             children: [
-                                               Icon(Icons.lock_rounded, size: 12, color: Colors.amber.shade700),
-                                               const SizedBox(width: 4),
-                                               Text(
-                                                 'Permanent Admin',
-                                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade800),
-                                               ),
-                                             ],
-                                           ),
-                                         ),
-                                       ],
+                                      ] else ...[
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            OutlinedButton.icon(
+                                              style: OutlinedButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                visualDensity: VisualDensity.compact,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                              icon: const Icon(Icons.edit_outlined, size: 12),
+                                              label: const Text('Edit', style: TextStyle(fontSize: 11)),
+                                              onPressed: () => ProfileManagementDialogs.showEditProfileDialog(context, authProvider),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            OutlinedButton.icon(
+                                              style: OutlinedButton.styleFrom(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                visualDensity: VisualDensity.compact,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                              ),
+                                              icon: const Icon(Icons.lock_reset_rounded, size: 12),
+                                              label: const Text('Password', style: TextStyle(fontSize: 11)),
+                                              onPressed: () => ProfileManagementDialogs.showChangePasswordDialog(context, authProvider),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ],

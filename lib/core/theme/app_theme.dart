@@ -86,12 +86,46 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
           side: const BorderSide(color: cardBorder, width: 1),
         ),
         clipBehavior: Clip.antiAliasWithSaveLayer,
       ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: Colors.white,
+        modalBarrierColor: Color(0x550F172A),
+        elevation: 16,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 12,
+        shadowColor: const Color(0xFF0F172A).withOpacity(0.12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: cardBorder, width: 1),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFFF1F5F9),
+        thickness: 1,
+        space: 1,
+      ),
+      expansionTileTheme: const ExpansionTileThemeData(
+        shape: RoundedRectangleBorder(side: BorderSide.none),
+        collapsedShape: RoundedRectangleBorder(side: BorderSide.none),
+      ),
+      focusColor: primaryColor.withOpacity(0.08),
+      hoverColor: primaryColor.withOpacity(0.04),
+      splashColor: primaryColor.withOpacity(0.08),
+      highlightColor: Colors.transparent,
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
@@ -142,6 +176,18 @@ class AppTheme {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: primaryColor, width: 1.8),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: error, width: 1),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: error, width: 1.8),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(

@@ -118,6 +118,13 @@ class AdminPromoCodesScreen extends StatelessWidget {
                     promo.description,
                     style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                   ),
+                  if (promo.minOrderAmount != null && promo.minOrderAmount! > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Min order: ৳${promo.minOrderAmount!.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                  ],
                   if (promo.expiresAt != null) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -145,28 +152,37 @@ class AdminPromoCodesScreen extends StatelessWidget {
                     provider.togglePromoStatus(promo.code, val);
                   },
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppTheme.error),
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Delete Voucher'),
-                        content: Text('Delete coupon "${promo.code}"?'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
-                            child: const Text('Delete'),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 20, color: AppTheme.textSecondary),
+                      onPressed: () => _showAddPromoDialog(context, provider, existingPromo: promo),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppTheme.error),
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Delete Voucher'),
+                            content: Text('Delete coupon "${promo.code}"?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx, true),
+                                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+                                child: const Text('Delete'),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) {
-                      await provider.deletePromoCode(promo.code);
-                    }
-                  },
+                        );
+                        if (confirm == true) {
+                          await provider.deletePromoCode(promo.code);
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -176,22 +192,38 @@ class AdminPromoCodesScreen extends StatelessWidget {
     );
   }
 
-  void _showAddPromoDialog(BuildContext context, AdminProvider provider) {
-    final codeCtrl = TextEditingController();
-    final discountCtrl = TextEditingController(text: '20');
-    final descCtrl = TextEditingController();
-    final daysCtrl = TextEditingController(text: '30');
+  void _showAddPromoDialog(BuildContext context, AdminProvider provider, {PromoCodeModel? existingPromo}) {
+    final isEdit = existingPromo != null;
+    final codeCtrl = TextEditingController(text: existingPromo?.code ?? '');
+    final discountCtrl = TextEditingController(
+      text: existingPromo != null
+          ? (existingPromo.discountPercent <= 1.0
+                  ? (existingPromo.discountPercent * 100).toInt()
+                  : existingPromo.discountPercent.toInt())
+              .toString()
+          : '20',
+    );
+    final minOrderCtrl = TextEditingController(
+      text: existingPromo?.minOrderAmount != null ? existingPromo!.minOrderAmount!.toStringAsFixed(0) : '',
+    );
+    final descCtrl = TextEditingController(text: existingPromo?.description ?? '');
+    final daysCtrl = TextEditingController(
+      text: existingPromo?.expiresAt != null
+          ? existingPromo!.expiresAt!.difference(DateTime.now()).inDays.clamp(1, 365).toString()
+          : '30',
+    );
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Create Promo Code', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(isEdit ? 'Edit Promo Code' : 'Create Promo Code', style: const TextStyle(fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: codeCtrl,
+                enabled: !isEdit,
                 textCapitalization: TextCapitalization.characters,
                 decoration: const InputDecoration(
                   labelText: 'Coupon Code (e.g. FLASH30)',
@@ -206,6 +238,16 @@ class AdminPromoCodesScreen extends StatelessWidget {
                   labelText: 'Discount Percentage (%)',
                   hintText: '20',
                   suffixText: '%',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: minOrderCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Min Order Amount (৳, Optional)',
+                  hintText: '500',
+                  prefixText: '৳ ',
                 ),
               ),
               const SizedBox(height: 12),
@@ -234,23 +276,26 @@ class AdminPromoCodesScreen extends StatelessWidget {
             onPressed: () async {
               final code = codeCtrl.text.trim().toUpperCase();
               final discountVal = double.tryParse(discountCtrl.text.trim()) ?? 0;
+              final minOrderVal = double.tryParse(minOrderCtrl.text.trim());
               final desc = descCtrl.text.trim();
               final days = int.tryParse(daysCtrl.text.trim()) ?? 30;
 
               if (code.isEmpty || discountVal <= 0) return;
 
               final promo = PromoCodeModel(
+                id: code,
                 code: code,
-                discountPercent: discountVal / 100,
-                isActive: true,
+                discountPercent: discountVal > 1.0 ? discountVal / 100 : discountVal,
+                isActive: existingPromo?.isActive ?? true,
                 description: desc.isNotEmpty ? desc : '${discountVal.toInt()}% off discount',
+                minOrderAmount: minOrderVal,
                 expiresAt: DateTime.now().add(Duration(days: days)),
               );
 
               await provider.savePromoCode(promo);
               if (context.mounted) Navigator.pop(ctx);
             },
-            child: const Text('Create Code'),
+            child: Text(isEdit ? 'Save Changes' : 'Create Code'),
           ),
         ],
       ),
