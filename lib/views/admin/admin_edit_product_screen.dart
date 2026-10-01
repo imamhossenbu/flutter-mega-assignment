@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
+import '../../models/category_model.dart';
 import '../../models/product_model.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/product_provider.dart';
@@ -24,9 +26,11 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
   late TextEditingController _priceController;
   late TextEditingController _originalPriceController;
   late TextEditingController _stockController;
+  late TextEditingController _unitSizeController;
   late TextEditingController _imageUrlController;
   late TextEditingController _descriptionController;
 
+  String _selectedUnit = 'pcs';
   final Set<String> _selectedColors = {};
   final Set<String> _selectedSizes = {};
 
@@ -59,12 +63,10 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
         setState(() {
           _imageUrlController.text = uploadedUrl;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Image uploaded to Cloudinary successfully! ☁️'),
-            backgroundColor: AppTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ),
+        AppToast.showSuccess(
+          context,
+          'Image uploaded to Cloudinary successfully! ☁️',
+          title: 'Upload Complete',
         );
       }
     } catch (e) {
@@ -165,12 +167,7 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                 newPreset: presetCtrl.text,
               );
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Cloudinary configuration updated!'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              AppToast.showSuccess(context, 'Cloudinary configuration updated!', title: 'Configuration Saved');
             },
             child: const Text('Save & Apply'),
           ),
@@ -206,6 +203,568 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
     },
   ];
 
+  static const List<Map<String, String>> unitOptions = [
+    {'key': 'pcs', 'label': 'Pieces (pcs)', 'short': 'pcs'},
+    {'key': 'ml', 'label': 'Milliliters (ml)', 'short': 'ml'},
+    {'key': 'L', 'label': 'Liters (L)', 'short': 'L'},
+    {'key': 'g', 'label': 'Grams (g)', 'short': 'g'},
+    {'key': 'kg', 'label': 'Kilograms (kg)', 'short': 'kg'},
+    {'key': 'pack', 'label': 'Pack / Bundle', 'short': 'pack'},
+    {'key': 'pair', 'label': 'Pairs (pair)', 'short': 'pair'},
+    {'key': 'box', 'label': 'Boxes (box)', 'short': 'box'},
+  ];
+
+  Future<void> _showAddCategoryDialog(BuildContext context, AdminProvider adminProvider) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add New Category'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Category Name',
+            hintText: 'e.g. Perfume, Skincare, Groceries',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      await adminProvider.addCategory(name);
+      setState(() => _categoryController.text = name);
+      if (context.mounted) {
+        AppToast.showSuccess(context, 'Category "$name" added and selected! 🎉', title: 'Category Created');
+      }
+    }
+  }
+
+  void _openCategorySearchModal(BuildContext context, AdminProvider adminProvider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            // Deduplicate categories by name (keep the one with most subcategories)
+            final allCats = adminProvider.categories;
+            final Map<String, CategoryModel> seen = {};
+            for (final cat in allCats) {
+              if (!seen.containsKey(cat.name) || cat.subcategories.length > seen[cat.name]!.subcategories.length) {
+                seen[cat.name] = cat;
+              }
+            }
+            final categories = seen.values.toList();
+            final q = query.trim().toLowerCase();
+            final filtered = categories.where((cat) {
+              if (q.isEmpty) return true;
+              final parentMatch = cat.name.toLowerCase().contains(q);
+              final subMatch = cat.subcategories.any((s) => s.toLowerCase().contains(q));
+              return parentMatch || subMatch;
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.78,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Select Category',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.primaryColor,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text(
+                            'New Category',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showAddCategoryDialog(context, adminProvider);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Search category or subcategory...',
+                        prefixIcon: Icon(Icons.search_rounded, size: 20),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      onChanged: (val) => setModalState(() => query = val),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.category_outlined, size: 48, color: Colors.grey),
+                                const SizedBox(height: 8),
+                                const Text('No category found matching search', style: TextStyle(color: AppTheme.textMuted)),
+                                const SizedBox(height: 10),
+                                if (query.trim().isNotEmpty)
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.add_rounded, size: 16),
+                                    label: Text('Create "$query"'),
+                                    onPressed: () async {
+                                      final newName = query.trim();
+                                      Navigator.pop(ctx);
+                                      await adminProvider.addCategory(newName);
+                                      setState(() => _categoryController.text = newName);
+                                      if (context.mounted) {
+                                        AppToast.showSuccess(context, 'Created and selected category "$newName"');
+                                      }
+                                    },
+                                  ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+                            itemCount: filtered.length,
+                            itemBuilder: (ctx, i) {
+                              final cat = filtered[i];
+                              final isSelected = _categoryController.text.toLowerCase() == cat.name.toLowerCase();
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppTheme.primaryColor.withOpacity(0.06) : Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected ? AppTheme.primaryColor : const Color(0xFFE2E8F0),
+                                    width: isSelected ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: Theme(
+                                  data: Theme.of(ctx).copyWith(dividerColor: Colors.transparent),
+                                  child: cat.subcategories.isEmpty
+                                      ? ListTile(
+                                          leading: Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryColor.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Icon(Icons.folder_rounded, color: AppTheme.primaryColor, size: 18),
+                                          ),
+                                          title: Text(cat.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                          trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppTheme.primaryColor) : null,
+                                          onTap: () {
+                                            setState(() => _categoryController.text = cat.name);
+                                            Navigator.pop(ctx);
+                                          },
+                                        )
+                                      : ExpansionTile(
+                                          initiallyExpanded: q.isNotEmpty || isSelected,
+                                          leading: Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.primaryColor.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: const Icon(Icons.folder_rounded, color: AppTheme.primaryColor, size: 18),
+                                          ),
+                                          title: Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  cat.name,
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  '${cat.subcategories.length} sub',
+                                                  style: const TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              TextButton(
+                                                style: TextButton.styleFrom(
+                                                  visualDensity: VisualDensity.compact,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                  foregroundColor: AppTheme.primaryColor,
+                                                ),
+                                                onPressed: () {
+                                                  setState(() => _categoryController.text = cat.name);
+                                                  Navigator.pop(ctx);
+                                                },
+                                                child: const Text('Select', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                              ),
+                                              const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8)),
+                                            ],
+                                          ),
+                                          children: [
+                                            ListTile(
+                                              contentPadding: const EdgeInsets.only(left: 36, right: 16),
+                                              leading: const Icon(Icons.done_all_rounded, size: 18, color: AppTheme.primaryColor),
+                                              title: Text(
+                                                'All in ${cat.name}',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                                  color: isSelected ? AppTheme.primaryColor : const Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                              trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppTheme.primaryColor, size: 18) : null,
+                                              onTap: () {
+                                                setState(() => _categoryController.text = cat.name);
+                                                Navigator.pop(ctx);
+                                              },
+                                            ),
+                                            ...cat.subcategories.map((sub) {
+                                            final isSubSelected = _categoryController.text.toLowerCase() == sub.toLowerCase() ||
+                                                _categoryController.text.toLowerCase() == '${cat.name} > $sub'.toLowerCase();
+                                            return ListTile(
+                                              contentPadding: const EdgeInsets.only(left: 36, right: 16),
+                                              leading: const Icon(Icons.subdirectory_arrow_right_rounded, size: 18, color: AppTheme.primaryColor),
+                                              title: Text(
+                                                sub,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: isSubSelected ? FontWeight.bold : FontWeight.w500,
+                                                  color: isSubSelected ? AppTheme.primaryColor : const Color(0xFF1E293B),
+                                                ),
+                                              ),
+                                              trailing: isSubSelected ? const Icon(Icons.check_circle_rounded, color: AppTheme.primaryColor, size: 18) : null,
+                                              onTap: () {
+                                                setState(() => _categoryController.text = '${cat.name} > $sub');
+                                                Navigator.pop(ctx);
+                                              },
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openBrandSearchModal(BuildContext context, AdminProvider adminProvider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final brands = adminProvider.brands.map((b) => b.name).toList();
+            if (brands.isEmpty) {
+              brands.addAll(['Apple', 'Sony', 'Nike', 'Samsung', 'Adidas', 'Logitech', 'Bose']);
+            }
+            final q = query.trim().toLowerCase();
+            final filtered = brands.where((b) => q.isEmpty || b.toLowerCase().contains(q)).toList();
+
+            return Container(
+              height: MediaQuery.of(ctx).size.height * 0.72,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 16, 12),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Select Brand',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.primaryColor,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text(
+                            'New Brand',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showAddBrandDialog(context, adminProvider);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      decoration: const InputDecoration(
+                        hintText: 'Search brands (e.g. Nike, Apple, Sony)...',
+                        prefixIcon: Icon(Icons.search_rounded, size: 20),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      onChanged: (val) => setModalState(() => query = val),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.business_outlined, size: 48, color: Colors.grey),
+                                const SizedBox(height: 8),
+                                const Text('No brand found', style: TextStyle(color: AppTheme.textMuted)),
+                                const SizedBox(height: 10),
+                                if (query.trim().isNotEmpty)
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.add_rounded, size: 16),
+                                    label: Text('Create Brand "$query"'),
+                                    onPressed: () async {
+                                      final newBrand = query.trim();
+                                      Navigator.pop(ctx);
+                                      await adminProvider.addBrand(newBrand);
+                                      setState(() => _brandController.text = newBrand);
+                                      if (context.mounted) {
+                                        AppToast.showSuccess(context, 'Created and selected brand "$newBrand"');
+                                      }
+                                    },
+                                  ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                            itemBuilder: (ctx, i) {
+                              final brandName = filtered[i];
+                              final isSelected = _brandController.text.toLowerCase() == brandName.toLowerCase();
+                              return ListTile(
+                                leading: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      brandName.isNotEmpty ? brandName[0].toUpperCase() : 'B',
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.white : AppTheme.primaryColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  brandName,
+                                  style: TextStyle(
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                    color: isSelected ? AppTheme.primaryColor : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: AppTheme.primaryColor) : null,
+                                onTap: () {
+                                  setState(() => _brandController.text = brandName);
+                                  Navigator.pop(ctx);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _showAddBrandDialog(BuildContext context, AdminProvider adminProvider) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add New Brand'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Brand Name',
+            hintText: 'e.g. Dior, Gucci, Nestlé',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      await adminProvider.addBrand(name);
+      setState(() => _brandController.text = name);
+      if (context.mounted) {
+        AppToast.showSuccess(context, 'Brand "$name" added and selected! 🏷️', title: 'Brand Created');
+      }
+    }
+  }
+
+  Future<void> _showAddSizeDialog(BuildContext context, AdminProvider adminProvider) async {
+    final controller = TextEditingController();
+    final size = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Size / Capacity'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Size / Volume / Weight',
+            hintText: 'e.g. 100ml, 250ml, 1L, 500g, XL, 42',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (size != null && size.isNotEmpty) {
+      await adminProvider.addSize(size);
+      setState(() => _selectedSizes.add(size));
+    }
+  }
+
+  Future<void> _showAddColorDialog(BuildContext context, AdminProvider adminProvider) async {
+    final controller = TextEditingController();
+    final color = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Color'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Color Name',
+            hintText: 'e.g. Ocean Blue, Rose Gold',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    if (color != null && color.isNotEmpty) {
+      await adminProvider.addColor(color);
+      setState(() => _selectedColors.add(color));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -217,6 +776,8 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
     _originalPriceController = TextEditingController(
         text: p != null && p.originalPrice > 0 ? p.originalPrice.toStringAsFixed(2) : '');
     _stockController = TextEditingController(text: p != null ? '${p.stockCount}' : '20');
+    _unitSizeController = TextEditingController(text: p?.unitSize ?? '');
+    _selectedUnit = p?.unit ?? 'pcs';
     _imageUrlController = TextEditingController(text: p?.imageUrl ?? '');
     _descriptionController = TextEditingController(text: p?.description ?? '');
 
@@ -240,6 +801,7 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
     _priceController.dispose();
     _originalPriceController.dispose();
     _stockController.dispose();
+    _unitSizeController.dispose();
     _imageUrlController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -273,6 +835,8 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
       isFeatured: _isFeatured,
       inStock: _inStock && stock > 0,
       stockCount: stock,
+      unit: _selectedUnit,
+      unitSize: _unitSizeController.text.trim().isNotEmpty ? _unitSizeController.text.trim() : null,
     );
 
     bool success;
@@ -286,21 +850,17 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
     setState(() => _isSaving = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.product == null ? 'Product added successfully!' : 'Product updated!'),
-          backgroundColor: AppTheme.success,
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppToast.showSuccess(
+        context,
+        widget.product == null ? 'Product added to catalog successfully!' : 'Product updated successfully!',
+        title: 'Catalog Saved',
       );
       Navigator.of(context).pop();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to save product. Please try again.'),
-          backgroundColor: AppTheme.error,
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppToast.showError(
+        context,
+        'Failed to save product. Please try again.',
+        title: 'Save Failed',
       );
     }
   }
@@ -309,8 +869,6 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
   Widget build(BuildContext context) {
     final isEditing = widget.product != null;
     final adminProvider = context.watch<AdminProvider>();
-    final dbCategories = (adminProvider.categories).map((c) => c.name).toList();
-    final dbBrands = (adminProvider.brands).map((b) => b.name).toList();
     final dbColors = adminProvider.colors;
     final dbSizes = adminProvider.sizes;
 
@@ -365,78 +923,112 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                     },
                   ),
                   const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _brandController,
-                          decoration: const InputDecoration(
-                            labelText: 'Brand *',
-                            hintText: 'e.g., Sony, Nike',
-                            prefixIcon: Icon(Icons.business_rounded),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Brand is required' : null,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _categoryController,
-                          decoration: const InputDecoration(
-                            labelText: 'Category *',
-                            hintText: 'e.g., Audio',
-                            prefixIcon: Icon(Icons.category_outlined),
-                          ),
-                          validator: (v) => v == null || v.trim().isEmpty ? 'Category is required' : null,
-                        ),
-                      ),
-                    ],
+
+                  // 1. Searchable Category & Subcategory Picker Dropdown
+                  const Text(
+                    'Category & Subcategory *',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
                   ),
-                  if (dbBrands.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Text('Select Brand:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: dbBrands.map((b) {
-                        final selected = _brandController.text.toLowerCase() == b.toLowerCase();
-                        return ChoiceChip(
-                          label: Text(b, style: TextStyle(fontSize: 12, color: selected ? Colors.white : AppTheme.textSecondary)),
-                          selected: selected,
-                          selectedColor: AppTheme.primaryColor,
-                          backgroundColor: Colors.grey.shade100,
-                          onSelected: (_) => setState(() => _brandController.text = b),
-                        );
-                      }).toList(),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => _openCategorySearchModal(context, adminProvider),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _categoryController.text.isNotEmpty ? AppTheme.primaryColor.withOpacity(0.6) : AppTheme.cardBorder,
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.category_rounded, color: AppTheme.primaryColor, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _categoryController.text.isNotEmpty
+                                  ? _categoryController.text
+                                  : 'Select Category / Subcategory (Tap to search)...',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: _categoryController.text.isNotEmpty ? FontWeight.w700 : FontWeight.normal,
+                                color: _categoryController.text.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B), size: 24),
+                        ],
+                      ),
                     ),
-                  ],
-                  if (dbCategories.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Text('Select Category:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: dbCategories.map((cat) {
-                        final selected = _categoryController.text.toLowerCase() == cat.toLowerCase();
-                        return ChoiceChip(
-                          label: Text(cat, style: TextStyle(fontSize: 12, color: selected ? Colors.white : AppTheme.textSecondary)),
-                          selected: selected,
-                          selectedColor: AppTheme.primaryColor,
-                          backgroundColor: Colors.grey.shade100,
-                          onSelected: (_) => setState(() => _categoryController.text = cat),
-                        );
-                      }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. Searchable Brand Picker Dropdown
+                  const Text(
+                    'Brand *',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => _openBrandSearchModal(context, adminProvider),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _brandController.text.isNotEmpty ? AppTheme.primaryColor.withOpacity(0.6) : AppTheme.cardBorder,
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.business_rounded, color: Colors.blue, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _brandController.text.isNotEmpty
+                                  ? _brandController.text
+                                  : 'Select Brand (Tap to search)...',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: _brandController.text.isNotEmpty ? FontWeight.w700 : FontWeight.normal,
+                                color: _brandController.text.isNotEmpty ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748B), size: 24),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // Pricing & Stock
+              // Pricing & Stock & Measurement Unit
               _buildSectionCard(
-                title: 'Pricing & Inventory',
+                title: 'Pricing & Inventory Measurement',
                 icon: Icons.monetization_on_outlined,
                 children: [
                   Row(
@@ -481,43 +1073,125 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+
+                  // Measurement Unit Selection (Pieces vs ml vs kg vs pack)
+                  const Text(
+                    'Quantity Unit / Measurement System:',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Select the unit for this product (e.g. piece for clothes/electronics, ml for liquid/perfumes, kg for weight)',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: unitOptions.map((opt) {
+                      final isSelected = _selectedUnit == opt['key'];
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedUnit = opt['key']!),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: isSelected ? [
+                              BoxShadow(color: AppTheme.primaryColor.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2)),
+                            ] : null,
+                          ),
+                          child: Text(
+                            opt['label']!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              color: isSelected ? Colors.white : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                   const SizedBox(height: 14),
+
                   Row(
                     children: [
+                      // Unit package volume/weight (e.g. 250 for 250ml)
+                      Expanded(
+                        child: TextFormField(
+                          controller: _unitSizeController,
+                          decoration: InputDecoration(
+                            labelText: 'Package Capacity / Size',
+                            hintText: 'e.g. 250, 500, 1.5',
+                            prefixIcon: const Icon(Icons.straighten_rounded),
+                            suffixText: _selectedUnit,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Available stock count
                       Expanded(
                         child: TextFormField(
                           controller: _stockController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Stock Units *',
+                          decoration: InputDecoration(
+                            labelText: 'Available Stock *',
                             hintText: '25',
-                            prefixIcon: Icon(Icons.inventory_2_outlined),
+                            prefixIcon: const Icon(Icons.inventory_2_outlined),
+                            suffixText: _selectedUnit,
                           ),
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Stock is required';
                             final s = int.tryParse(v.trim());
-                            if (s == null || s < 0) return 'Stock must be 0 or more';
+                            if (s == null || s < 0) return 'Stock must be >= 0';
                             return null;
                           },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('In Stock', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          value: _inStock,
-                          activeColor: AppTheme.primaryColor,
-                          onChanged: (v) => setState(() => _inStock = v),
+                          onChanged: (_) => setState(() {}),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+
+                  // Dynamic Stock Preview Pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.primaryColor.withOpacity(0.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified_outlined, size: 16, color: AppTheme.primaryColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Inventory Display: ${_stockController.text.trim().isEmpty ? '0' : _stockController.text.trim()} '
+                            '${_unitSizeController.text.trim().isNotEmpty ? "($_unitSizeController.text $_selectedUnit) units" : _selectedUnit} in stock',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.primaryColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   const SizedBox(height: 8),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
+                    title: const Text('In Stock Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    value: _inStock,
+                    activeColor: AppTheme.primaryColor,
+                    onChanged: (v) => setState(() => _inStock = v),
+                  ),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
                     title: const Text('Mark as Featured Product', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Appears in the top banner and featured carousel', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                    subtitle: const Text('Appears in top banner and featured carousel', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                     value: _isFeatured,
                     activeColor: AppTheme.primaryColor,
                     onChanged: (v) => setState(() => _isFeatured = v),
@@ -547,69 +1221,133 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Colors Multi-select
-                  const Text('Available Colors:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
-                  const SizedBox(height: 4),
-                  const Text('Tap to toggle colors available for this product', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                  const SizedBox(height: 8),
-                  Wrap(
+                  // Colors Multi-select with + Add Color Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Available Colors:',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                        label: const Text('Add Color', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () => _showAddColorDialog(context, adminProvider),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: dbColors.map((colorName) {
                       final isSelected = _selectedColors.contains(colorName);
-                      return FilterChip(
-                        label: Text(colorName),
-                        selected: isSelected,
-                        selectedColor: AppTheme.primaryColor.withOpacity(0.15),
-                        checkmarkColor: AppTheme.primaryColor,
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
-                        ),
-                        onSelected: (selected) {
+                      return GestureDetector(
+                        onTap: () {
                           setState(() {
-                            if (selected) {
-                              _selectedColors.add(colorName);
-                            } else {
+                            if (isSelected) {
                               _selectedColors.remove(colorName);
+                            } else {
+                              _selectedColors.add(colorName);
                             }
                           });
                         },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: isSelected ? [
+                              BoxShadow(color: AppTheme.primaryColor.withOpacity(0.28), blurRadius: 6, offset: const Offset(0, 2)),
+                            ] : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelected) ...[
+                                const Icon(Icons.check_rounded, size: 12, color: Colors.white),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                colorName,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
                     }).toList(),
                   ),
                   const SizedBox(height: 16),
 
-                  // Sizes Multi-select
-                  const Text('Available Sizes:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+                  // Sizes Multi-select with + Add Size Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Available Sizes / Capacities:',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                        label: const Text('Add Size / Volume', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () => _showAddSizeDialog(context, adminProvider),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 4),
-                  const Text('Tap to toggle sizes available for this product', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                  const Text('Select or add sizes (e.g. S, M, XL) or volumes (e.g. 100ml, 250ml, 1L)', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: dbSizes.map((sizeName) {
                       final isSelected = _selectedSizes.contains(sizeName);
-                      return FilterChip(
-                        label: Text(sizeName),
-                        selected: isSelected,
-                        selectedColor: AppTheme.primaryColor.withOpacity(0.15),
-                        checkmarkColor: AppTheme.primaryColor,
-                        labelStyle: TextStyle(
-                          fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
-                        ),
-                        onSelected: (selected) {
+                      return GestureDetector(
+                        onTap: () {
                           setState(() {
-                            if (selected) {
-                              _selectedSizes.add(sizeName);
-                            } else {
+                            if (isSelected) {
                               _selectedSizes.remove(sizeName);
+                            } else {
+                              _selectedSizes.add(sizeName);
                             }
                           });
                         },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: isSelected ? [
+                              BoxShadow(color: AppTheme.primaryColor.withOpacity(0.28), blurRadius: 6, offset: const Offset(0, 2)),
+                            ] : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelected) ...[
+                                const Icon(Icons.check_rounded, size: 12, color: Colors.white),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(
+                                sizeName,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
                     }).toList(),
                   ),
@@ -648,11 +1386,17 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
     final url = _imageUrlController.text.trim();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,16 +1512,38 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: _sampleImagePresets.map((preset) {
+                final isActive = _imageUrlController.text == preset['url'];
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ActionChip(
-                    avatar: const Icon(Icons.photo_size_select_actual_outlined, size: 16),
-                    label: Text(preset['title']!),
-                    onPressed: () {
-                      setState(() {
-                        _imageUrlController.text = preset['url']!;
-                      });
-                    },
+                  child: GestureDetector(
+                    onTap: () => setState(() => _imageUrlController.text = preset['url']!),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: isActive ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: isActive ? [
+                          BoxShadow(color: AppTheme.primaryColor.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2)),
+                        ] : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.photo_size_select_actual_outlined, size: 14,
+                            color: isActive ? Colors.white : const Color(0xFF64748B)),
+                          const SizedBox(width: 5),
+                          Text(
+                            preset['title']!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                              color: isActive ? Colors.white : const Color(0xFF475569),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
@@ -794,23 +1560,38 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
     required List<Widget> children,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: AppTheme.primaryColor, size: 20),
-              SizedBox(width: 8),
-              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: AppTheme.primaryColor, size: 17),
+              ),
+              const SizedBox(width: 10),
+              Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          const Divider(color: Color(0xFFF1F5F9), height: 16),
           ...children,
         ],
       ),

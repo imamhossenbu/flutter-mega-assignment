@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../details/product_details_screen.dart';
@@ -175,12 +176,10 @@ class WishlistScreen extends StatelessWidget {
                                       InkWell(
                                         onTap: () {
                                           cartProvider.addToCart(product);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Added "${product.name}" to cart!'),
-                                              duration: const Duration(seconds: 1),
-                                              behavior: SnackBarBehavior.floating,
-                                            ),
+                                          AppToast.showSuccess(
+                                            context,
+                                            'Added "${product.name}" to cart! 🛍️',
+                                            title: 'Moved to Cart',
                                           );
                                         },
                                         borderRadius: BorderRadius.circular(8),

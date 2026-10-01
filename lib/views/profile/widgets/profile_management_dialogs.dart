@@ -1,14 +1,18 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../../providers/auth_provider.dart';
 
 class ProfileManagementDialogs {
-  /// Opens a fully validated dialog for updating name and phone number
+  /// Opens a fully validated dialog for updating name, phone number, and photo
   static void showEditProfileDialog(BuildContext context, AuthProvider auth) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: auth.displayName);
     final phoneCtrl = TextEditingController(text: auth.phone);
     bool isSaving = false;
+    bool isUploadingPhoto = false;
 
     showDialog(
       context: context,
@@ -28,6 +32,53 @@ class ProfileManagementDialogs {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Photo Avatar with Upload
+                  Center(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CircleAvatar(
+                          radius: 34,
+                          backgroundColor: AppTheme.primaryColor.withOpacity(0.12),
+                          backgroundImage: auth.photoUrl.isNotEmpty
+                              ? CachedNetworkImageProvider(auth.photoUrl)
+                              : null,
+                          child: isUploadingPhoto
+                              ? const CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryColor)
+                              : (auth.photoUrl.isEmpty
+                                  ? Text(
+                                      auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
+                                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                                    )
+                                  : null),
+                        ),
+                        Positioned(
+                          bottom: -2,
+                          right: -2,
+                          child: InkWell(
+                            onTap: isUploadingPhoto
+                                ? null
+                                : () async {
+                                    setState(() => isUploadingPhoto = true);
+                                    await auth.uploadProfileImage(source: ImageSource.gallery);
+                                    setState(() => isUploadingPhoto = false);
+                                  },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   TextFormField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(
@@ -81,13 +132,11 @@ class ProfileManagementDialogs {
                       );
                       if (context.mounted) {
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(success ? 'Profile updated successfully! ✨' : 'Failed to update profile.'),
-                            backgroundColor: success ? AppTheme.success : AppTheme.error,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        if (success) {
+                          AppToast.showSuccess(context, 'Profile updated successfully! ✨', title: 'Profile Updated');
+                        } else {
+                          AppToast.showError(context, 'Failed to update profile.', title: 'Update Failed');
+                        }
                       }
                     },
               child: isSaving
@@ -228,13 +277,7 @@ class ProfileManagementDialogs {
                       if (success) {
                         if (context.mounted) {
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Password updated successfully! 🔒'),
-                              backgroundColor: AppTheme.success,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          AppToast.showSuccess(context, 'Password updated successfully! 🔒', title: 'Password Changed');
                         }
                       } else {
                         setState(() {

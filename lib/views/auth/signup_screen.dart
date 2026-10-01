@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../admin/admin_main_screen.dart';
+import '../main_navigation_screen.dart';
 import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -29,6 +31,21 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
+  void _routeAfterAuth(AuthProvider auth) {
+    if (!mounted) return;
+    if (auth.isAdmin) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AdminMainScreen()),
+        (route) => false,
+      );
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (route) => false,
+      );
+    }
+  }
+
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
@@ -38,7 +55,7 @@ class _SignupScreenState extends State<SignupScreen> {
       _nameController.text,
     );
     if (success && mounted) {
-      Navigator.of(context).pop();
+      _routeAfterAuth(auth);
     }
   }
 
@@ -112,9 +129,32 @@ class _SignupScreenState extends State<SignupScreen> {
                       const Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          auth.errorMessage!,
-                          style: const TextStyle(color: AppTheme.error, fontSize: 13),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              auth.errorMessage!,
+                              style: const TextStyle(color: AppTheme.error, fontSize: 13, height: 1.3),
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () {
+                                auth.clearError();
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                );
+                              },
+                              child: const Text(
+                                '👉 Tap here to Sign In instead',
+                                style: TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

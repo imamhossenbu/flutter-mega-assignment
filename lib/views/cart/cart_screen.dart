@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../providers/cart_provider.dart';
 import '../orders/checkout_screen.dart';
 
@@ -145,19 +146,16 @@ class _CartScreenState extends State<CartScreen> {
                                     if (!context.mounted) return;
                                     if (success) {
                                       _couponController.clear();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Promo voucher applied successfully! 🎉'),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
+                                      AppToast.showSuccess(
+                                        context,
+                                        'Promo voucher applied successfully! 🎉',
+                                        title: 'Discount Applied',
                                       );
                                     } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Invalid promo code. Try "MEGA20" or "WELCOME10"'),
-                                          backgroundColor: AppTheme.error,
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
+                                      AppToast.showError(
+                                        context,
+                                        'Invalid promo code. Try "MEGA20" or "WELCOME10"',
+                                        title: 'Invalid Voucher',
                                       );
                                     }
                                   },

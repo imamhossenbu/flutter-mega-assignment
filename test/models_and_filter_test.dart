@@ -104,4 +104,22 @@ void main() {
       expect(inactivePromo.isValid, false);
     });
   });
+
+  group('Category & Catalog Navigation Tests', () {
+    test('AppConstants has standard e-commerce categories', () {
+      expect(AppConstants.categories.isNotEmpty, true);
+      expect(AppConstants.categories.any((c) => c.id == 'All'), true);
+      expect(AppConstants.categories.any((c) => c.id == 'Electronics'), true);
+      expect(AppConstants.categories.any((c) => c.id == 'Footwear'), true);
+    });
+
+    test('Initial products match categories in catalogue', () {
+      final categories = AppConstants.categories.map((c) => c.name.toLowerCase()).toSet();
+      expect(categories.isNotEmpty, true);
+      for (final p in AppConstants.initialProducts) {
+        expect(p.name.isNotEmpty, true);
+        expect(p.price > 0, true);
+      }
+    });
+  });
 }

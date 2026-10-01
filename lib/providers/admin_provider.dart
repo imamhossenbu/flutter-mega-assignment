@@ -168,6 +168,28 @@ class AdminProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> addSubcategory(String categoryId, String subcategoryName) async {
+    try {
+      await FirebaseService.instance.addSubcategory(categoryId, subcategoryName);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteSubcategory(String categoryId, String subcategoryName) async {
+    try {
+      await FirebaseService.instance.deleteSubcategory(categoryId, subcategoryName);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Brands
   Future<bool> addBrand(String name) async {
     try {
@@ -271,6 +293,23 @@ class AdminProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<bool> deleteUser(String userId) async {
+    try {
+      await FirebaseService.instance.deleteUser(userId);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<int> clearAllUsersExceptAdmin() async {
+    final count = await FirebaseService.instance.deleteAllUsersExceptAdmin();
+    notifyListeners();
+    return count;
   }
 
   @override

@@ -1,7 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../models/product_model.dart';
 import '../../providers/product_provider.dart';
 import 'admin_edit_product_screen.dart';
@@ -58,11 +60,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                 ),
               );
               if (confirm == true && context.mounted) {
-                final messenger = ScaffoldMessenger.of(context);
                 await productProvider.reseedSampleProducts();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Catalog re-seeded! 🚀'), behavior: SnackBarBehavior.floating),
-                );
+                if (context.mounted) {
+                  AppToast.showSuccess(context, 'Catalog re-seeded successfully! 🚀', title: 'Catalog Restored');
+                }
               }
             },
           ),
@@ -110,19 +111,53 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                       final selected = _selectedCategory == cat;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(
-                            cat,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
-                              color: selected ? Colors.white : AppTheme.textSecondary,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOut,
+                          decoration: BoxDecoration(
+                            color: selected ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? AppTheme.primaryColor : const Color(0xFFE2E8F0),
+                              width: 1.0,
+                            ),
+                            boxShadow: selected
+                                ? [
+                                    BoxShadow(
+                                      color: AppTheme.primaryColor.withOpacity(0.25),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => setState(() => _selectedCategory = cat),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (selected) ...[
+                                      const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Text(
+                                      cat,
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                        color: selected ? Colors.white : const Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                          selected: selected,
-                          selectedColor: AppTheme.primaryColor,
-                          backgroundColor: Colors.grey.shade100,
-                          onSelected: (_) => setState(() => _selectedCategory = cat),
                         ),
                       );
                     }).toList(),
@@ -220,12 +255,29 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
               child: Container(
                 width: 76,
                 height: 76,
-                color: Colors.grey.shade100,
-                child: CachedNetworkImage(
-                  imageUrl: product.imageUrl,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
-                ),
+                color: const Color(0xFFF1F5F9),
+                child: kIsWeb
+                    ? Image.network(
+                        product.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8), size: 28),
+                        ),
+                        loadingBuilder: (ctx, child, progress) {
+                          if (progress == null) return child;
+                          return Container(color: const Color(0xFFF8FAFC));
+                        },
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: product.imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(color: const Color(0xFFF8FAFC)),
+                        errorWidget: (_, __, ___) => Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF94A3B8), size: 28),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 12),
@@ -403,6 +455,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                     );
                     if (confirm == true) {
                       await provider.deleteProduct(product.id);
+                      if (context.mounted) {
+                        AppToast.showSuccess(
+                          context,
+                          'Deleted "${product.name}" from catalog',
+                          title: 'Product Removed',
+                        );
+                      }
                     }
                   },
                 ),

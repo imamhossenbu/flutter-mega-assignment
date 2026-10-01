@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../providers/auth_provider.dart';
+import '../admin/admin_main_screen.dart';
+import '../main_navigation_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -24,6 +27,21 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  void _routeAfterAuth(AuthProvider auth) {
+    if (!mounted) return;
+    if (auth.isAdmin) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AdminMainScreen()),
+        (route) => false,
+      );
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (route) => false,
+      );
+    }
+  }
+
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
@@ -32,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
     );
     if (success && mounted) {
-      Navigator.of(context).pop();
+      _routeAfterAuth(auth);
     }
   }
 
@@ -184,7 +202,48 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () async {
+                          final email = _emailController.text.trim();
+                          if (email.isEmpty) {
+                            AppToast.showWarning(
+                              context,
+                              'Please enter your email above to receive a password reset link.',
+                              title: 'Email Required',
+                            );
+                            return;
+                          }
+                          final success = await auth.sendPasswordReset(email);
+                          if (context.mounted) {
+                            if (success) {
+                              AppToast.showSuccess(
+                                context,
+                                'Password reset link sent to $email! Please check your email inbox.',
+                                title: 'Reset Link Sent',
+                              );
+                            } else {
+                              AppToast.showError(
+                                context,
+                                auth.errorMessage ?? 'Failed to send reset email.',
+                                title: 'Reset Failed',
+                              );
+                            }
+                          }
+                        },
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
                     // Sign In Button
                     SizedBox(

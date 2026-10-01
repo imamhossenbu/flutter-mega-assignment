@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../core/constants/app_constants.dart';
 import '../models/filter_options.dart';
 import '../models/product_model.dart';
 import '../services/firebase_service.dart';
@@ -26,43 +25,33 @@ class ProductProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // 1. Initial fallback so UI is immediately responsive
-    _allProducts = AppConstants.initialProducts;
-
-    // 2. Check if Firestore needs seeding
+    // Seed initial products to Firestore if collection is empty (first run only)
     try {
       await SeedDataService.seedInitialProductsIfNeeded();
     } catch (e) {
       debugPrint('Firestore seed check failed: $e');
     }
 
-    // 3. Listen to real-time updates from Firestore
+    // Listen to real-time updates from Firestore — only real data
     try {
       _subscription = FirebaseService.instance.streamProducts().listen(
         (products) {
-          if (products.isNotEmpty) {
-            _allProducts = products;
-          } else {
-            _allProducts = AppConstants.initialProducts;
-          }
+          _allProducts = products;
           _isLoading = false;
           _errorMessage = null;
           notifyListeners();
         },
         onError: (err) {
           debugPrint('Firestore stream products error: $err');
-          // Maintain fallback data if stream fails
-          if (_allProducts.isEmpty) {
-            _allProducts = AppConstants.initialProducts;
-          }
           _isLoading = false;
-          _errorMessage = err.toString();
+          _errorMessage = 'Failed to load products. Please check your connection.';
           notifyListeners();
         },
       );
     } catch (e) {
       debugPrint('Firestore listen setup error: $e');
       _isLoading = false;
+      _errorMessage = 'Failed to connect to store. Please try again.';
       notifyListeners();
     }
   }
@@ -93,7 +82,6 @@ class ProductProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     await SeedDataService.reseedAllProducts();
-    _allProducts = AppConstants.initialProducts;
     _isLoading = false;
     notifyListeners();
   }
@@ -176,8 +164,9 @@ class ProductProvider extends ChangeNotifier {
     }
   }
 
+  // Categories derived from actual product data (plus 'All')
   List<String> get allCategories {
-    final set = <String>{'All', 'Electronics', 'Footwear', 'Audio', 'Watches', 'Fashion'};
+    final set = <String>{'All'};
     for (final p in _allProducts) {
       if (p.category.trim().isNotEmpty) {
         set.add(p.category.trim());
@@ -188,8 +177,10 @@ class ProductProvider extends ChangeNotifier {
 
   int get totalProductsCount => _allProducts.length;
   int get inStockCount => _allProducts.where((p) => p.inStock && p.stockCount > 0).length;
-  int get lowStockCount => _allProducts.where((p) => p.stockCount > 0 && p.stockCount < 5).length;
+  int get lowStockCount => _allProducts.where((p) => p.stockCount > 0 && p.stockCount <= 5).length;
   int get outOfStockCount => _allProducts.where((p) => !p.inStock || p.stockCount <= 0).length;
+  List<ProductModel> get lowStockProducts =>
+      _allProducts.where((p) => !p.inStock || p.stockCount <= 5).toList();
 
   Future<bool> addProduct(ProductModel product) async {
     try {

@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../models/order_model.dart';
+import '../../models/product_model.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
@@ -12,10 +16,40 @@ import 'admin_edit_product_screen.dart';
 import 'admin_orders_screen.dart';
 import 'admin_products_screen.dart';
 import 'admin_promo_codes_screen.dart';
+import '../main_navigation_screen.dart';
 import '../profile/widgets/profile_management_dialogs.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({super.key});
+
+  Future<void> _handleSignOut(BuildContext context, AuthProvider auth) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Sign Out Admin'),
+        content: const Text('Are you sure you want to sign out from the Admin Portal?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sign Out', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && context.mounted) {
+      await auth.signOut();
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +139,24 @@ class AdminDashboardScreen extends StatelessWidget {
                             ProfileManagementDialogs.showChangePasswordDialog(context, authProvider);
                           },
                         ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.error.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.logout_rounded, color: AppTheme.error),
+                          ),
+                          title: const Text('Sign Out Admin', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.error)),
+                          subtitle: const Text('Safely log out of admin console'),
+                          trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.error),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _handleSignOut(context, authProvider);
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -113,9 +165,9 @@ class AdminDashboardScreen extends StatelessWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.storefront_rounded),
-            tooltip: 'Back to Store',
-            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.logout_rounded, color: AppTheme.error),
+            tooltip: 'Sign Out Admin',
+            onPressed: () => _handleSignOut(context, authProvider),
           ),
         ],
       ),
@@ -348,16 +400,19 @@ class AdminDashboardScreen extends StatelessWidget {
                     onTap: () async {
                       await productProvider.reseedSampleProducts();
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Sample catalog restored! 🚀'), behavior: SnackBarBehavior.floating),
-                        );
+                        AppToast.showSuccess(context, 'Sample catalog restored! 🚀', title: 'Catalog Reset');
                       }
                     },
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+
+            // Low Stock & Restock Alerts Widget
+            _buildLowStockAlerts(context, productProvider),
+
+            const SizedBox(height: 10),
 
             // Management Navigation Modules
             const Text(
@@ -639,6 +694,348 @@ class AdminDashboardScreen extends StatelessWidget {
             const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted, size: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLowStockAlerts(BuildContext context, ProductProvider productProvider) {
+    final lowStockItems = productProvider.lowStockProducts;
+
+    if (lowStockItems.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFBBF7D0)),
+        ),
+        child: Row(
+          children: const [
+            Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+            SizedBox(width: 10),
+            Text(
+              'All products have healthy inventory levels',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFED7AA), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF59E0B).withOpacity(0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFFEDD5)),
+                    ),
+                    child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Low Stock Alerts',
+                            style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${lowStockItems.length}',
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Items need restocking to prevent lost sales',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminProductsScreen()),
+                ),
+                child: const Text('View All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 10),
+          ...lowStockItems.take(5).map((p) => _buildLowStockItemTile(context, p, productProvider)),
+          if (lowStockItems.length > 5) ...[
+            const SizedBox(height: 6),
+            Center(
+              child: TextButton.icon(
+                icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                label: Text(
+                  'Manage all ${lowStockItems.length} low stock items in Catalog',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminProductsScreen()),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLowStockItemTile(BuildContext context, ProductModel product, ProductProvider productProvider) {
+    final isOut = !product.inStock || product.stockCount <= 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isOut ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isOut ? const Color(0xFFFECACA) : const Color(0xFFFDE68A),
+        ),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: kIsWeb
+                  ? Image.network(
+                      product.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.broken_image_outlined, size: 20, color: Colors.grey),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: product.imageUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 150,
+                      errorWidget: (_, __, ___) => Container(
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.broken_image_outlined, size: 20, color: Colors.grey),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: isOut ? const Color(0xFFDC2626) : const Color(0xFFD97706),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isOut ? 'OUT OF STOCK' : 'ONLY ${product.stockCount} ${product.unit.toUpperCase()} LEFT',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                    if (product.displayQuantity.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        product.displayQuantity,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showQuickRestockDialog(context, product, productProvider),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isOut
+                      ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
+                      : [AppTheme.primaryColor, const Color(0xFF4338CA)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isOut ? const Color(0xFFEF4444) : AppTheme.primaryColor).withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.add_rounded, size: 13, color: Colors.white),
+                  const SizedBox(width: 4),
+                  const Text('Restock', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.2)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuickRestockDialog(BuildContext context, ProductModel product, ProductProvider productProvider) {
+    final controller = TextEditingController(text: '${product.stockCount}');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.inventory_rounded, color: AppTheme.primaryColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Text('Update Inventory', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              product.name,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Current stock: ${product.stockCount} ${product.unit}',
+              style: TextStyle(
+                fontSize: 12,
+                color: product.stockCount <= 5 ? AppTheme.error : AppTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'New Stock Quantity (${product.unit})',
+                hintText: 'Enter new stock count',
+                prefixIcon: const Icon(Icons.add_shopping_cart_rounded),
+                suffixText: product.unit,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [10, 20, 50, 100].map((addAmount) {
+                return ActionChip(
+                  label: Text('+$addAmount'),
+                  onPressed: () {
+                    final curr = int.tryParse(controller.text) ?? 0;
+                    controller.text = '${curr + addAmount}';
+                  },
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final newStock = int.tryParse(controller.text.trim());
+              if (newStock == null || newStock < 0) {
+                AppToast.showError(context, 'Please enter a valid non-negative number');
+                return;
+              }
+              Navigator.pop(ctx);
+              final success = await productProvider.updateStock(product.id, newStock);
+              if (context.mounted) {
+                if (success) {
+                  AppToast.showSuccess(
+                    context,
+                    'Updated inventory for "${product.name}" to $newStock ${product.unit}',
+                    title: 'Stock Updated',
+                  );
+                } else {
+                  AppToast.showError(context, 'Failed to update stock');
+                }
+              }
+            },
+            child: const Text('Save Stock'),
+          ),
+        ],
       ),
     );
   }

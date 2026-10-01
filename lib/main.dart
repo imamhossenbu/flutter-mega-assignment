@@ -12,6 +12,7 @@ import 'providers/product_provider.dart';
 import 'providers/review_provider.dart';
 import 'providers/wishlist_provider.dart';
 import 'services/firebase_service.dart';
+import 'views/admin/admin_main_screen.dart';
 import 'views/main_navigation_screen.dart';
 
 Future<void> main() async {
@@ -28,6 +29,12 @@ Future<void> main() async {
   // Seed promo codes to Firestore (only if not already seeded)
   try {
     FirebaseService.instance.seedPromoCodes();
+  } catch (_) {}
+
+  // Seed official Admin account and purge all other user records
+  try {
+    await FirebaseService.instance.seedAdminUser();
+    await FirebaseService.instance.deleteAllUsersExceptAdmin(adminEmail: 'admin@megastore.com');
   } catch (_) {}
 
   runApp(const MyApp());
@@ -52,8 +59,29 @@ class MyApp extends StatelessWidget {
         title: 'MegaStore - Firebase E-Commerce',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const MainNavigationScreen(),
+        home: const AuthGate(),
       ),
     );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (auth.isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.primaryColor),
+        ),
+      );
+    }
+    if (auth.isAuthenticated && auth.isAdmin) {
+      return const AdminMainScreen();
+    }
+    return const MainNavigationScreen();
   }
 }

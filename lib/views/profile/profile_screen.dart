@@ -1,6 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/wishlist_provider.dart';
@@ -10,6 +13,55 @@ import 'widgets/profile_management_dialogs.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<void> _pickAndUploadPhoto(BuildContext context, AuthProvider auth) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Update Profile Picture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: AppTheme.primaryColor),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primaryColor),
+                title: const Text('Take a Photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source != null && context.mounted) {
+      AppToast.showInfo(context, 'Uploading profile photo... ⏳', title: 'Uploading');
+      final url = await auth.uploadProfileImage(source: source);
+      if (context.mounted) {
+        if (url != null) {
+          AppToast.showSuccess(
+            context,
+            'Profile picture updated successfully! ✨',
+            title: 'Profile Updated',
+          );
+        } else {
+          AppToast.showError(
+            context,
+            'Failed to upload picture. Please try again.',
+            title: 'Upload Failed',
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,18 +165,58 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
-                        style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
-                      ),
+                  GestureDetector(
+                    onTap: auth.isUploadingPhoto ? null : () => _pickAndUploadPhoto(context, auth),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 66,
+                          height: 66,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            image: auth.photoUrl.isNotEmpty
+                                ? DecorationImage(
+                                    image: CachedNetworkImageProvider(auth.photoUrl),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: auth.isUploadingPhoto
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                  ),
+                                )
+                              : (auth.photoUrl.isEmpty
+                                  ? Center(
+                                      child: Text(
+                                        auth.displayName.isNotEmpty ? auth.displayName[0].toUpperCase() : 'U',
+                                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white),
+                                      ),
+                                    )
+                                  : null),
+                        ),
+                        Positioned(
+                          bottom: -2,
+                          right: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2)),
+                              ],
+                            ),
+                            child: const Icon(Icons.camera_alt_rounded, size: 13, color: AppTheme.primaryColor),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 16),

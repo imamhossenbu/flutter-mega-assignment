@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
+import '../core/widgets/modern_bottom_nav.dart';
 import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/order_provider.dart';
@@ -21,19 +23,22 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _currentIndex;
+  String? _lastSyncedUserId;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final auth = context.read<AuthProvider>();
-      final userId = auth.userId;
-      _syncProviders(userId);
+      _syncProviders(auth.userId);
     });
   }
 
   void _syncProviders(String userId) {
+    if (_lastSyncedUserId == userId) return;
+    _lastSyncedUserId = userId;
     context.read<CartProvider>().updateUserId(userId);
     context.read<WishlistProvider>().updateUserId(userId);
     context.read<OrderProvider>().updateUserId(userId);
@@ -43,15 +48,62 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     setState(() => _currentIndex = index);
   }
 
+  Widget _buildNavProfileAvatar(AuthProvider auth, bool isSelected) {
+    if (auth.photoUrl.isNotEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+            width: isSelected ? 2.0 : 1.2,
+          ),
+        ),
+        child: CircleAvatar(
+          radius: 12,
+          backgroundColor: Colors.grey.shade100,
+          backgroundImage: CachedNetworkImageProvider(auth.photoUrl),
+        ),
+      );
+    } else if (auth.isAuthenticated && auth.displayName.isNotEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: CircleAvatar(
+          radius: 12,
+          backgroundColor: isSelected ? AppTheme.primaryColor : AppTheme.primaryColor.withOpacity(0.15),
+          child: Text(
+            auth.displayName[0].toUpperCase(),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : AppTheme.primaryColor,
+            ),
+          ),
+        ),
+      );
+    }
+    return Icon(
+      isSelected ? Icons.person_rounded : Icons.person_outline_rounded,
+      color: isSelected ? AppTheme.primaryColor : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final userId = auth.userId;
-    // Sync providers on next frame (not during build)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _syncProviders(userId);
-    });
+    // Sync providers only when userId actually changes
+    if (_lastSyncedUserId != userId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _syncProviders(userId);
+      });
+    }
 
     final cartQuantity = context.watch<CartProvider>().totalQuantity;
     final wishlistCount = context.watch<WishlistProvider>().count;
@@ -76,74 +128,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         index: _currentIndex,
         children: pages,
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: const Border(
-            top: BorderSide(color: AppTheme.cardBorder, width: 1),
+      bottomNavigationBar: ModernBottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: _navigateToTab,
+        items: [
+          const ModernNavItem(
+            icon: Icon(Icons.explore_outlined),
+            activeIcon: Icon(Icons.explore_rounded),
+            label: 'Explore',
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: _navigateToTab,
-          backgroundColor: Colors.white,
-          indicatorColor: AppTheme.primaryColor.withOpacity(0.12),
-          elevation: 0,
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.explore_outlined),
-              selectedIcon: Icon(Icons.explore_rounded, color: AppTheme.primaryColor),
-              label: 'Explore',
-            ),
-            NavigationDestination(
-              icon: Badge(
-                isLabelVisible: wishlistCount > 0,
-                label: Text('$wishlistCount'),
-                backgroundColor: AppTheme.accentColor,
-                child: const Icon(Icons.favorite_outline_rounded),
-              ),
-              selectedIcon: Badge(
-                isLabelVisible: wishlistCount > 0,
-                label: Text('$wishlistCount'),
-                backgroundColor: AppTheme.accentColor,
-                child: const Icon(Icons.favorite_rounded, color: AppTheme.primaryColor),
-              ),
-              label: 'Wishlist',
-            ),
-            NavigationDestination(
-              icon: Badge(
-                isLabelVisible: cartQuantity > 0,
-                label: Text('$cartQuantity'),
-                backgroundColor: AppTheme.primaryColor,
-                child: const Icon(Icons.shopping_cart_outlined),
-              ),
-              selectedIcon: Badge(
-                isLabelVisible: cartQuantity > 0,
-                label: Text('$cartQuantity'),
-                backgroundColor: AppTheme.primaryColor,
-                child: const Icon(Icons.shopping_cart_rounded, color: AppTheme.primaryColor),
-              ),
-              label: 'Cart',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded, color: AppTheme.primaryColor),
-              label: 'Orders',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard_rounded, color: AppTheme.primaryColor),
-              label: 'Dashboard',
-            ),
-          ],
-        ),
+          ModernNavItem(
+            icon: const Icon(Icons.favorite_outline_rounded),
+            activeIcon: const Icon(Icons.favorite_rounded),
+            label: 'Wishlist',
+            badgeCount: wishlistCount,
+            badgeColor: AppTheme.accentColor,
+          ),
+          ModernNavItem(
+            icon: const Icon(Icons.shopping_bag_outlined),
+            activeIcon: const Icon(Icons.shopping_bag_rounded),
+            label: 'Cart',
+            badgeCount: cartQuantity,
+            badgeColor: AppTheme.primaryColor,
+          ),
+          const ModernNavItem(
+            icon: Icon(Icons.receipt_long_outlined),
+            activeIcon: Icon(Icons.receipt_long_rounded),
+            label: 'Orders',
+          ),
+          ModernNavItem(
+            icon: _buildNavProfileAvatar(auth, false),
+            activeIcon: _buildNavProfileAvatar(auth, true),
+            label: 'Dashboard',
+          ),
+        ],
       ),
     );
   }

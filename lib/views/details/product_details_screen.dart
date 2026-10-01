@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../models/product_model.dart';
 import '../../models/review_model.dart';
 import '../../providers/auth_provider.dart';
@@ -88,18 +89,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                     onPressed: () {
                       wishlistProvider.toggleWishlist(product);
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isWishlisted
-                                ? 'Removed from wishlist'
-                                : 'Added to wishlist ❤️',
-                          ),
-                          duration: const Duration(seconds: 1),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
+                      if (isWishlisted) {
+                        AppToast.showInfo(context, 'Removed from wishlist', title: 'Wishlist');
+                      } else {
+                        AppToast.showSuccess(context, 'Added "${product.name}" to wishlist ❤️', title: 'Wishlist');
+                      }
                     },
                   ),
                 ),
@@ -178,21 +172,44 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          product.category.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primaryColor,
-                            letterSpacing: 0.8,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              product.category.toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.primaryColor,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (product.displayQuantity.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                              ),
+                              child: Text(
+                                product.displayQuantity,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Row(
                         children: [
@@ -206,7 +223,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            product.inStock ? 'In Stock (${product.stockCount})' : 'Out of Stock',
+                            product.inStock ? product.stockDisplay : 'Out of Stock',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -484,9 +501,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           : null,
                     ),
                     Text(
-                      '$_quantity',
+                      product.unit != 'pcs' ? '$_quantity ${product.unit}' : '$_quantity',
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.textPrimary,
                       ),
@@ -513,20 +530,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           selectedSize: _selectedSize,
                         );
 
-                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Added $_quantity "${product.name}" to cart! 🛍️'),
-                        backgroundColor: AppTheme.textPrimary,
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(
-                          label: 'GO TO CART',
-                          textColor: Colors.amber,
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                      ),
+                    AppToast.showSuccess(
+                      context,
+                      'Added $_quantity "${product.name}" to cart! 🛍️',
+                      title: 'Added to Cart',
+                      actionLabel: 'GO TO CART',
+                      onAction: () => Navigator.of(context).pop(),
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -579,12 +588,7 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
   void _showWriteReviewSheet(BuildContext context) {
     final auth = context.read<AuthProvider>();
     if (auth.isGuest) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please sign in to write a review'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.showWarning(context, 'Please sign in to write a review', title: 'Sign In Required');
       return;
     }
 
@@ -663,15 +667,11 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);
                                 _commentController.clear();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(success
-                                        ? 'Review submitted! ⭐'
-                                        : 'You have already reviewed this product.'),
-                                    backgroundColor: success ? AppTheme.success : AppTheme.error,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                if (success) {
+                                  AppToast.showSuccess(context, 'Review submitted! ⭐', title: 'Thank You');
+                                } else {
+                                  AppToast.showError(context, 'You have already reviewed this product.', title: 'Duplicate Review');
+                                }
                               }
                             },
                       child: reviewProvider.isSubmitting

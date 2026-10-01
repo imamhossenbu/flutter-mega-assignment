@@ -50,44 +50,132 @@ class FirebaseService {
   }
 
   Future<User?> signInWithEmail(String email, String password) async {
+    final cleanEmail = email.trim();
+    final normalized = cleanEmail.toLowerCase();
     try {
       final cred = await _auth!.signInWithEmailAndPassword(
-        email: email.trim(),
+        email: cleanEmail,
         password: password,
       );
+      // Ensure admin profile exists in Firestore
+      if (cred.user != null && (normalized == 'admin@megastore.com' || normalized.startsWith('admin@'))) {
+        await _firestore?.collection('users').doc(cred.user!.uid).set({
+          'name': 'MegaStore Admin',
+          'email': cleanEmail,
+          'role': 'admin',
+        }, SetOptions(merge: true));
+      }
       return cred.user;
     } on FirebaseAuthException catch (e) {
       debugPrint('Sign in error: ${e.code} - ${e.message}');
+      // If admin account does not exist in Firebase Auth yet, auto-register it with this password!
+      if ((normalized == 'admin@megastore.com' || normalized == 'admin@gmail.com') &&
+          (e.code == 'user-not-found' || e.code == 'invalid-credential')) {
+        try {
+          final newCred = await _auth!.createUserWithEmailAndPassword(
+            email: cleanEmail,
+            password: password,
+          );
+          if (newCred.user != null) {
+            await newCred.user!.updateDisplayName('MegaStore Admin');
+            await _firestore?.collection('users').doc(newCred.user!.uid).set({
+              'name': 'MegaStore Admin',
+              'email': cleanEmail,
+              'photoUrl': '',
+              'phone': '',
+              'role': 'admin',
+              'createdAt': DateTime.now().toIso8601String(),
+            }, SetOptions(merge: true));
+            return newCred.user;
+          }
+        } catch (createErr) {
+          debugPrint('Auto-create admin error: $createErr');
+        }
+      }
       rethrow;
+    }
+  }
+
+  Future<void> seedAdminUser() async {
+    const adminEmail = 'admin@megastore.com';
+    const adminPass = 'admin123456';
+    final auth = _auth;
+    final firestore = _firestore;
+    if (auth == null || firestore == null) return;
+    try {
+      User? user;
+      try {
+        final cred = await auth.signInWithEmailAndPassword(email: adminEmail, password: adminPass);
+        user = cred.user;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+          try {
+            final cred = await auth.createUserWithEmailAndPassword(email: adminEmail, password: adminPass);
+            user = cred.user;
+          } catch (_) {}
+        }
+      }
+      if (user != null) {
+        await user.updateDisplayName('MegaStore Admin');
+        await firestore.collection('users').doc(user.uid).set({
+          'name': 'MegaStore Admin',
+          'email': adminEmail,
+          'role': 'admin',
+          'createdAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('Admin seed notice: $e');
     }
   }
 
   Future<User?> signInWithGoogle() async {
     try {
       if (_auth == null) return null;
-      final GoogleSignIn googleSignIn = GoogleSignIn();
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        // User cancelled the sign-in
-        return null;
+      User? user;
+
+      if (kIsWeb) {
+        // Native Firebase Auth popup for web (no GoogleSignIn ClientID assertion error)
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        final UserCredential userCredential = await _auth!.signInWithPopup(googleProvider);
+        user = userCredential.user;
+      } else {
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        if (googleUser == null) {
+          // User cancelled the sign-in
+          return null;
+        }
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        final AuthCredential credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+        final UserCredential userCredential = await _auth!.signInWithCredential(credential);
+        user = userCredential.user;
       }
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      final UserCredential userCredential = await _auth!.signInWithCredential(credential);
-      final user = userCredential.user;
+
       if (user != null) {
+        final normalizedEmail = (user.email ?? '').trim().toLowerCase();
+        final bool isTargetAdmin = normalizedEmail == 'admin@megastore.com' ||
+            normalizedEmail.startsWith('admin@') ||
+            normalizedEmail.contains('admin');
+
         final userDoc = await _firestore?.collection('users').doc(user.uid).get();
         if (userDoc == null || !userDoc.exists) {
           await _firestore?.collection('users').doc(user.uid).set({
-            'name': user.displayName ?? 'Customer',
+            'name': user.displayName ?? (isTargetAdmin ? 'MegaStore Admin' : 'Customer'),
             'email': user.email ?? '',
             'photoUrl': user.photoURL ?? '',
             'phone': user.phoneNumber ?? '',
-            'role': 'customer',
+            'role': isTargetAdmin ? 'admin' : 'customer',
             'createdAt': DateTime.now().toIso8601String(),
+          }, SetOptions(merge: true));
+        } else if (isTargetAdmin && userDoc.data()?['role'] != 'admin') {
+          await _firestore?.collection('users').doc(user.uid).set({
+            'role': 'admin',
           }, SetOptions(merge: true));
         }
       }
@@ -108,13 +196,15 @@ class FirebaseService {
       // Save user profile to Firestore
       if (cred.user != null) {
         final normalizedEmail = email.trim().toLowerCase();
-        final bool isAdminEmail = normalizedEmail.startsWith('admin@') || normalizedEmail.contains('admin');
+        final bool isTargetAdmin = normalizedEmail == 'admin@megastore.com' ||
+            normalizedEmail.startsWith('admin@') ||
+            normalizedEmail.contains('admin');
         await _firestore?.collection('users').doc(cred.user!.uid).set({
-          'name': name.trim(),
+          'name': isTargetAdmin && name.trim().isEmpty ? 'MegaStore Admin' : name.trim(),
           'email': email.trim(),
           'photoUrl': '',
           'phone': '',
-          'role': isAdminEmail ? 'admin' : 'customer',
+          'role': isTargetAdmin ? 'admin' : 'customer',
           'createdAt': DateTime.now().toIso8601String(),
         }, SetOptions(merge: true));
       }
@@ -133,16 +223,18 @@ class FirebaseService {
     }
   }
 
-  Future<void> updateUserProfile(String userId, {String? name, String? phone}) async {
+  Future<void> updateUserProfile(String userId, {String? name, String? phone, String? photoUrl}) async {
     final firestore = _firestore;
     if (firestore == null) return;
     final updates = <String, dynamic>{};
     if (name != null) updates['name'] = name;
     if (phone != null) updates['phone'] = phone;
+    if (photoUrl != null) updates['photoUrl'] = photoUrl;
     if (updates.isEmpty) return;
     try {
       await firestore.collection('users').doc(userId).set(updates, SetOptions(merge: true));
       if (name != null) await _auth?.currentUser?.updateDisplayName(name);
+      if (photoUrl != null) await _auth?.currentUser?.updatePhotoURL(photoUrl);
     } catch (e) {
       debugPrint('Error updating profile: $e');
     }
@@ -163,12 +255,31 @@ class FirebaseService {
     }
   }
 
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth?.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Password reset error: ${e.code}');
+      rethrow;
+    }
+  }
+
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     final firestore = _firestore;
     if (firestore == null) return null;
     try {
       final doc = await firestore.collection('users').doc(userId).get();
-      return doc.data();
+      final data = doc.data();
+      if (data != null) {
+        final email = (data['email'] as String? ?? '').trim().toLowerCase();
+        if (email == 'admin@megastore.com' || email.startsWith('admin@')) {
+          data['role'] = 'admin';
+          if (doc.data()?['role'] != 'admin') {
+            await firestore.collection('users').doc(userId).set({'role': 'admin'}, SetOptions(merge: true));
+          }
+        }
+      }
+      return data;
     } catch (e) {
       debugPrint('Error fetching profile: $e');
       return null;
@@ -671,6 +782,46 @@ class FirebaseService {
     }
   }
 
+  Future<void> deleteUser(String userId) async {
+    final firestore = _firestore;
+    if (firestore == null || userId.isEmpty) return;
+    try {
+      await firestore.collection('users').doc(userId).delete();
+    } catch (e) {
+      debugPrint('Error deleting user: $e');
+      rethrow;
+    }
+  }
+
+  Future<int> deleteAllUsersExceptAdmin({String adminEmail = 'admin@megastore.com'}) async {
+    final firestore = _firestore;
+    if (firestore == null) return 0;
+    int deletedCount = 0;
+    try {
+      final snapshot = await firestore.collection('users').get();
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final email = (data['email'] as String? ?? '').trim().toLowerCase();
+        // Delete all users except admin@megastore.com (specifically removes imam62310 and test accounts)
+        if (email != adminEmail.toLowerCase()) {
+          await doc.reference.delete();
+          deletedCount++;
+        } else {
+          // Guarantee admin role
+          await doc.reference.set({
+            'role': 'admin',
+            'name': data['name'] ?? 'MegaStore Administrator',
+            'email': adminEmail,
+          }, SetOptions(merge: true));
+        }
+      }
+      debugPrint('Cleaned users collection: removed $deletedCount users, preserved $adminEmail as Admin');
+    } catch (e) {
+      debugPrint('Error cleaning users collection: $e');
+    }
+    return deletedCount;
+  }
+
   // ===================== CATEGORIES =====================
 
   Stream<List<CategoryModel>> streamCategories() {
@@ -703,25 +854,108 @@ class FirebaseService {
     await firestore.collection('categories').doc(categoryId).delete();
   }
 
+  Future<void> addSubcategory(String categoryId, String subcategoryName) async {
+    final firestore = _firestore;
+    if (firestore == null || subcategoryName.trim().isEmpty) return;
+    await firestore.collection('categories').doc(categoryId).update({
+      'subcategories': FieldValue.arrayUnion([subcategoryName.trim()]),
+    });
+  }
+
+  Future<void> deleteSubcategory(String categoryId, String subcategoryName) async {
+    final firestore = _firestore;
+    if (firestore == null || subcategoryName.trim().isEmpty) return;
+    await firestore.collection('categories').doc(categoryId).update({
+      'subcategories': FieldValue.arrayRemove([subcategoryName.trim()]),
+    });
+  }
+
   Future<void> seedDefaultCategories() async {
     final firestore = _firestore;
     if (firestore == null) return;
     try {
       final existing = await firestore.collection('categories').limit(1).get();
-      if (existing.docs.isNotEmpty) return;
+      if (existing.docs.isNotEmpty) {
+        // If categories exist but have no subcategories, update them with default subcategories
+        final sample = existing.docs.first.data();
+        if ((sample['subcategories'] as List?)?.isNotEmpty ?? false) {
+          return;
+        }
+      }
       final defaultCats = [
-        'Electronics',
-        'Footwear',
-        'Audio',
-        'Watches',
-        'Fashion',
-        'Accessories',
-        'Home & Living',
+        CategoryModel(
+          id: 'cat_electronics',
+          name: 'Electronics',
+          subcategories: [
+            'Laptops & MacBooks',
+            'Smartphones & Tablets',
+            'Audio & Headphones',
+            'Wearables & Smartwatches',
+            'Cameras & Drones',
+          ],
+          createdAt: DateTime.now(),
+        ),
+        CategoryModel(
+          id: 'cat_fashion',
+          name: 'Fashion',
+          subcategories: [
+            "Men's Apparel",
+            "Women's Apparel",
+            'Footwear & Sneakers',
+            'Watches & Jewellery',
+            'Bags & Luggage',
+          ],
+          createdAt: DateTime.now(),
+        ),
+        CategoryModel(
+          id: 'cat_audio',
+          name: 'Audio',
+          subcategories: [
+            'Wireless Headphones',
+            'True Wireless Earbuds',
+            'Bluetooth Speakers',
+            'Studio Monitors',
+          ],
+          createdAt: DateTime.now(),
+        ),
+        CategoryModel(
+          id: 'cat_footwear',
+          name: 'Footwear',
+          subcategories: [
+            'Running Shoes',
+            'Streetwear Sneakers',
+            'Casual & Loafers',
+            'Formal & Boots',
+          ],
+          createdAt: DateTime.now(),
+        ),
+        CategoryModel(
+          id: 'cat_watches',
+          name: 'Watches',
+          subcategories: [
+            'Apple & Smartwatches',
+            'Luxury Chronographs',
+            'Classic Leather Bands',
+            'Sports & Fitness Trackers',
+          ],
+          createdAt: DateTime.now(),
+        ),
+        CategoryModel(
+          id: 'cat_home',
+          name: 'Home & Living',
+          subcategories: [
+            'Kitchen Appliances',
+            'Home Decor & Accents',
+            'Smart Ambient Lighting',
+            'Bedding & Bath',
+          ],
+          createdAt: DateTime.now(),
+        ),
       ];
       final batch = firestore.batch();
       for (final cat in defaultCats) {
-        final ref = firestore.collection('categories').doc();
-        batch.set(ref, CategoryModel(id: ref.id, name: cat, createdAt: DateTime.now()).toMap());
+        final ref = firestore.collection('categories').doc(cat.id);
+        batch.set(ref, cat.toMap(), SetOptions(merge: true));
       }
       await batch.commit();
     } catch (e) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/modern_bottom_nav.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/product_provider.dart';
 import 'admin_catalog_menu_screen.dart';
@@ -31,7 +32,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     final orderProvider = context.watch<OrderProvider>();
     final pendingOrdersCount = orderProvider.pendingOrdersCount;
     final productProvider = context.watch<ProductProvider>();
-    final lowStockCount = productProvider.lowStockCount;
+    final lowStockCount = productProvider.lowStockCount + productProvider.outOfStockCount;
 
     final pages = [
       const AdminDashboardScreen(),
@@ -41,80 +42,55 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       const AdminCustomersScreen(),
     ];
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: const Border(
-            top: BorderSide(color: AppTheme.cardBorder, width: 1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
         ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
-          backgroundColor: Colors.white,
-          indicatorColor: AppTheme.primaryColor.withOpacity(0.12),
-          elevation: 0,
-          destinations: [
-            const NavigationDestination(
+        bottomNavigationBar: ModernBottomNavBar(
+          currentIndex: _currentIndex,
+          onTap: (idx) => setState(() => _currentIndex = idx),
+          items: [
+            const ModernNavItem(
               icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard_rounded, color: AppTheme.primaryColor),
+              activeIcon: Icon(Icons.dashboard_rounded),
               label: 'Overview',
             ),
-            NavigationDestination(
-              icon: Badge(
-                isLabelVisible: lowStockCount > 0,
-                label: Text('$lowStockCount'),
-                backgroundColor: Colors.amber.shade800,
-                child: const Icon(Icons.inventory_2_outlined),
-              ),
-              selectedIcon: Badge(
-                isLabelVisible: lowStockCount > 0,
-                label: Text('$lowStockCount'),
-                backgroundColor: Colors.amber.shade800,
-                child: const Icon(Icons.inventory_2_rounded, color: AppTheme.primaryColor),
-              ),
+            ModernNavItem(
+              icon: const Icon(Icons.inventory_2_outlined),
+              activeIcon: const Icon(Icons.inventory_2_rounded),
               label: 'Products',
+              badgeCount: lowStockCount,
+              badgeColor: Colors.amber.shade800,
             ),
-            NavigationDestination(
-              icon: Badge(
-                isLabelVisible: pendingOrdersCount > 0,
-                label: Text('$pendingOrdersCount'),
-                backgroundColor: AppTheme.accentColor,
-                child: const Icon(Icons.local_shipping_outlined),
-              ),
-              selectedIcon: Badge(
-                isLabelVisible: pendingOrdersCount > 0,
-                label: Text('$pendingOrdersCount'),
-                backgroundColor: AppTheme.accentColor,
-                child: const Icon(Icons.local_shipping_rounded, color: AppTheme.primaryColor),
-              ),
+            ModernNavItem(
+              icon: const Icon(Icons.local_shipping_outlined),
+              activeIcon: const Icon(Icons.local_shipping_rounded),
               label: 'Orders',
+              badgeCount: pendingOrdersCount,
+              badgeColor: AppTheme.accentColor,
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.category_outlined),
-              selectedIcon: Icon(Icons.category_rounded, color: AppTheme.primaryColor),
+            const ModernNavItem(
+              icon: Icon(Icons.account_tree_outlined),
+              activeIcon: Icon(Icons.account_tree_rounded),
               label: 'Catalog',
             ),
-            const NavigationDestination(
+            const ModernNavItem(
               icon: Icon(Icons.people_outline_rounded),
-              selectedIcon: Icon(Icons.people_rounded, color: AppTheme.primaryColor),
+              activeIcon: Icon(Icons.people_rounded),
               label: 'Users',
             ),
           ],
         ),
-      ),
-    );
-  }
+    ),
+  );
+}
 }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_toast.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
@@ -51,16 +52,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final auth = context.read<AuthProvider>();
 
     if (auth.isGuest) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please sign in to place an order'),
-          action: SnackBarAction(
-            label: 'Sign In',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            ),
-          ),
-          behavior: SnackBarBehavior.floating,
+      AppToast.showWarning(
+        context,
+        'Please sign in to place an order',
+        title: 'Sign In Required',
+        actionLabel: 'Sign In',
+        onAction: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
         ),
       );
       return;
@@ -88,12 +86,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         MaterialPageRoute(builder: (_) => OrderSuccessScreen(order: order)),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to place order. Please try again.'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppTheme.error,
-        ),
+      AppToast.showError(
+        context,
+        'Failed to place order. Please try again.',
+        title: 'Order Failed',
       );
     }
   }

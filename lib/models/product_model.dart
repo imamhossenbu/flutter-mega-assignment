@@ -14,6 +14,8 @@ class ProductModel {
   final bool isFeatured;
   final bool inStock;
   final int stockCount;
+  final String unit; // 'pcs', 'ml', 'L', 'g', 'kg', 'pack', 'pair', 'box'
+  final String? unitSize; // e.g., '250' for 250ml or '500' for 500g
 
   const ProductModel({
     required this.id,
@@ -31,11 +33,22 @@ class ProductModel {
     this.isFeatured = false,
     this.inStock = true,
     this.stockCount = 10,
+    this.unit = 'pcs',
+    this.unitSize,
   });
 
   double get discountPercent {
     if (originalPrice <= price || originalPrice == 0) return 0;
     return (((originalPrice - price) / originalPrice) * 100).roundToDouble();
+  }
+
+  String get displayQuantity => (unitSize != null && unitSize!.isNotEmpty) ? '$unitSize $unit' : unit;
+
+  String get stockDisplay {
+    if (unitSize != null && unitSize!.isNotEmpty) {
+      return '$stockCount in stock ($unitSize $unit)';
+    }
+    return '$stockCount $unit in stock';
   }
 
   Map<String, dynamic> toMap() {
@@ -55,6 +68,8 @@ class ProductModel {
       'isFeatured': isFeatured,
       'inStock': inStock,
       'stockCount': stockCount,
+      'unit': unit,
+      'unitSize': unitSize,
     };
   }
 
@@ -75,6 +90,8 @@ class ProductModel {
       isFeatured: map['isFeatured'] as bool? ?? false,
       inStock: map['inStock'] as bool? ?? true,
       stockCount: (map['stockCount'] as num?)?.toInt() ?? 10,
+      unit: map['unit'] as String? ?? 'pcs',
+      unitSize: map['unitSize'] as String?,
     );
   }
 
@@ -94,6 +111,8 @@ class ProductModel {
     bool? isFeatured,
     bool? inStock,
     int? stockCount,
+    String? unit,
+    String? unitSize,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -111,6 +130,8 @@ class ProductModel {
       isFeatured: isFeatured ?? this.isFeatured,
       inStock: inStock ?? this.inStock,
       stockCount: stockCount ?? this.stockCount,
+      unit: unit ?? this.unit,
+      unitSize: unitSize ?? this.unitSize,
     );
   }
 }
