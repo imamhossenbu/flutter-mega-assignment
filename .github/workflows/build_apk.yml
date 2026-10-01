@@ -50,8 +50,8 @@ jobs:
           else
             touch .env
           fi
-          echo "CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME || 'mega-store' }}" >> .env
-          echo "CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET || 'flutter_preset' }}" >> .env
+          echo "CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME || 'dd6xynlko' }}" >> .env
+          echo "CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET || 'megastore' }}" >> .env
 
       - name: Install Dependencies
         run: flutter pub get

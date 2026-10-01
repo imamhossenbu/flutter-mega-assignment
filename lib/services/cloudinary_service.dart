@@ -11,8 +11,19 @@ class CloudinaryService {
   String? _cloudNameOverride;
   String? _uploadPresetOverride;
 
-  String get cloudName => _cloudNameOverride ?? dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
-  String get uploadPreset => _uploadPresetOverride ?? dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
+  String get cloudName {
+    if (_cloudNameOverride != null && _cloudNameOverride!.isNotEmpty) return _cloudNameOverride!;
+    final envVal = dotenv.isInitialized ? dotenv.env['CLOUDINARY_CLOUD_NAME'] : null;
+    if (envVal != null && envVal.isNotEmpty) return envVal;
+    return const String.fromEnvironment('CLOUDINARY_CLOUD_NAME', defaultValue: 'dd6xynlko');
+  }
+
+  String get uploadPreset {
+    if (_uploadPresetOverride != null && _uploadPresetOverride!.isNotEmpty) return _uploadPresetOverride!;
+    final envVal = dotenv.isInitialized ? dotenv.env['CLOUDINARY_UPLOAD_PRESET'] : null;
+    if (envVal != null && envVal.isNotEmpty) return envVal;
+    return const String.fromEnvironment('CLOUDINARY_UPLOAD_PRESET', defaultValue: 'megastore');
+  }
 
   void configure({String? newCloudName, String? newPreset}) {
     if (newCloudName != null && newCloudName.isNotEmpty) _cloudNameOverride = newCloudName.trim();
