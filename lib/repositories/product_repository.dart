@@ -85,11 +85,11 @@ class FirestoreProductRepository implements ProductRepository {
 
   @override
   Future<void> addProduct(ProductModel product) async {
-    final docRef = _productsRef.doc();
+    final docRef = product.id.isNotEmpty ? _productsRef.doc(product.id) : _productsRef.doc();
     final data = product.toMap();
     data['id'] = docRef.id;
     data['createdAt'] = FieldValue.serverTimestamp();
-    await docRef.set(data);
+    await docRef.set(data, SetOptions(merge: true));
   }
 
   @override

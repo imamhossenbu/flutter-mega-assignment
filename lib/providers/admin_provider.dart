@@ -84,45 +84,11 @@ class AdminProvider extends ChangeNotifier {
     ),
   ];
 
-  static final List<Map<String, dynamic>> _sampleUsers = [
-    {
-      'id': 'usr_admin_1',
-      'name': 'MegaStore Admin',
-      'email': 'admin@megastore.com',
-      'phone': '01700000000',
-      'role': 'admin',
-      'createdAt': '2026-09-01T10:00:00.000Z',
-    },
-    {
-      'id': 'usr_cust_1',
-      'name': 'Rahim Ahmed',
-      'email': 'rahim.ahmed@gmail.com',
-      'phone': '01712345678',
-      'role': 'customer',
-      'createdAt': '2026-09-15T14:30:00.000Z',
-    },
-    {
-      'id': 'usr_cust_2',
-      'name': 'Karim Ullah',
-      'email': 'karim.ullah@yahoo.com',
-      'phone': '01898765432',
-      'role': 'customer',
-      'createdAt': '2026-09-20T09:15:00.000Z',
-    },
-    {
-      'id': 'usr_cust_3',
-      'name': 'Nusrat Jahan',
-      'email': 'nusrat.jahan@hotmail.com',
-      'phone': '01987654321',
-      'role': 'customer',
-      'createdAt': '2026-09-25T16:45:00.000Z',
-    },
-  ];
+
 
   List<PromoCodeModel> get promoCodes =>
       _promoCodes.isEmpty ? _samplePromoCodes : _promoCodes;
-  List<Map<String, dynamic>> get users =>
-      _users.length <= 1 ? _sampleUsers : _users;
+  List<Map<String, dynamic>> get users => _users;
   List<CategoryModel> get categories => _categories;
   List<BrandModel> get brands => _brands;
   List<String> get colors => _colors;
@@ -387,6 +353,26 @@ class AdminProvider extends ChangeNotifier {
       debugPrint('clear users error: $e');
     }
     return count;
+  }
+
+  Future<void> deleteAllUsers() async {
+    try {
+      await _authRepository.deleteAllUsers();
+      await loadUsers();
+    } catch (e) {
+      debugPrint('deleteAllUsers error: $e');
+    }
+  }
+
+  Future<bool> makeUserAdminByEmail(String email) async {
+    try {
+      await _authRepository.makeUserAdminByEmail(email);
+      await loadUsers();
+      return true;
+    } catch (e) {
+      debugPrint('makeUserAdminByEmail error: $e');
+      return false;
+    }
   }
 
   @override

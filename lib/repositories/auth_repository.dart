@@ -31,6 +31,8 @@ abstract class AuthRepository {
   Future<List<Map<String, dynamic>>> getAllUsers();
   Future<void> updateUserRole({required String uid, required String role});
   Future<void> deleteUserDoc(String uid);
+  Future<void> makeUserAdminByEmail(String email);
+  Future<void> deleteAllUsers();
 }
 
 class FirebaseAuthRepository implements AuthRepository {
@@ -148,5 +150,28 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<void> deleteUserDoc(String uid) async {
     await _firestore.collection('users').doc(uid).delete();
+  }
+
+  @override
+  Future<void> makeUserAdminByEmail(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final snap = await _firestore.collection('users').get();
+    for (final doc in snap.docs) {
+      final docEmail = (doc.data()['email'] as String? ?? '').toLowerCase();
+      if (docEmail == cleanEmail) {
+        await doc.reference.update({
+          'role': 'admin',
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+      }
+    }
+  }
+
+  @override
+  Future<void> deleteAllUsers() async {
+    final snap = await _firestore.collection('users').get();
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
   }
 }
