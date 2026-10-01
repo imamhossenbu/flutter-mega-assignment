@@ -57,8 +57,10 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# APK binaries (hosted via cloud download links)
+# APK binaries
 *.apk
+!apk/
+!apk/*.apk
 downloads/*.apk
 test_screen.png
 emulator_screenshot.png

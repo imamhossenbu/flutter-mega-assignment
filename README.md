@@ -195,26 +195,23 @@ flutter run
 
 ---
 
-## 📦 Android APK & GitHub Actions CI/CD (10–20 MB Optimized)
+## 📦 Android APK Direct Downloads (10–20 MB Optimized)
 
-### 1. Build from GitHub (Cloud CI/CD)
-The repository includes a ready-to-use GitHub Actions workflow [`.github/workflows/build_apk.yml`](.github/workflows/build_apk.yml).
-- **Automatic Build**: Automatically triggers on every push to `main` or via **Workflow Dispatch** (manual trigger).
-- **Download Link**: Go to [GitHub Actions](https://github.com/imamhossenbu/flutter-mega-assignment/actions) → select the latest run → download the `android-release-apks` zip containing the release APKs.
+You can download the compiled APKs directly from this repository:
 
-### 2. Local APK Build (10–20 MB Optimized)
-To generate lightweight per-architecture APKs (17 MB – 20 MB):
-```bash
-# Optimized split-per-ABI build with code obfuscation
-flutter build apk --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols
-```
+| Architecture | APK File | Size | 🚀 1-Click Direct Download | Device Compatibility |
+|:---|:---|:---:|:---:|:---|
+| **ARM 64-bit** *(Recommended)* | [`MegaStore-release-arm64.apk`](apk/MegaStore-release-arm64.apk) | **~19.9 MB** | [⬇️ **Download ARM64 APK**](https://github.com/imamhossenbu/flutter-mega-assignment/raw/main/apk/MegaStore-release-arm64.apk) | All modern Android phones (2018–present) |
+| **ARM 32-bit** | [`MegaStore-release-arm32.apk`](apk/MegaStore-release-arm32.apk) | **~17.4 MB** | [⬇️ **Download ARM32 APK**](https://github.com/imamhossenbu/flutter-mega-assignment/raw/main/apk/MegaStore-release-arm32.apk) | Older 32-bit budget Android phones |
 
-**Generated Artifacts:**
-| Architecture | APK File | Size | Compatibility |
-|:---|:---|:---:|:---|
-| **ARM 64-bit** | `app-arm64-v8a-release.apk` | **~20.4 MB** | Modern Android devices |
-| **ARM 32-bit** | `app-armeabi-v7a-release.apk` | **~17.6 MB** | Older 32-bit devices |
-| **x86_64** | `app-x86_64-release.apk` | **~21.8 MB** | Android Emulators & Tablets |
+📁 Browse the APK folder directly: [`apk/`](apk/)
+
+### Cloud CI/CD & Local Build:
+* **GitHub Actions Workflow:** [`.github/workflows/build_apk.yml`](.github/workflows/build_apk.yml) automatically triggers builds on pushes to `main`.
+* **Local Build Command:**
+  ```bash
+  flutter build apk --split-per-abi --obfuscate --split-debug-info=build/app/outputs/symbols
+  ```
 
 ---
 
