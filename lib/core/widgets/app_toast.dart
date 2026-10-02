@@ -91,7 +91,7 @@ class AppToast {
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) return;
 
-    messenger.hideCurrentSnackBar();
+    messenger.clearSnackBars();
 
     Color iconColor;
     Color iconBgColor;

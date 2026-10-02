@@ -13,6 +13,8 @@ class ReviewProvider extends ChangeNotifier {
   bool get isSubmitting => _isSubmitting;
 
   List<ReviewModel> getReviews(String productId) => _reviewsCache[productId] ?? [];
+  bool hasLoaded(String productId) => _reviewsCache.containsKey(productId);
+  int getReviewCount(String productId) => _reviewsCache[productId]?.length ?? 0;
 
   ReviewProvider({ProductRepository? productRepository})
       : _productRepository = productRepository ?? FirestoreProductRepository();

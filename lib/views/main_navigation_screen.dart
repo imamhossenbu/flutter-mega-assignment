@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/wishlist_provider.dart';
+import 'auth/login_screen.dart';
 import 'cart/cart_screen.dart';
 import 'dashboard/customer_dashboard_screen.dart';
 import 'home/home_screen.dart';
@@ -111,57 +112,71 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final pages = [
       HomeScreen(
         onCartTap: () => _navigateToTab(2),
-        onProfileTap: () => _navigateToTab(4),
+        onProfileTap: () {
+          if (auth.isAuthenticated) {
+            _navigateToTab(4);
+          } else {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
+          }
+        },
       ),
       WishlistScreen(onExploreTap: () => _navigateToTab(0)),
       CartScreen(onExploreTap: () => _navigateToTab(0)),
       const OrdersScreen(),
-      CustomerDashboardScreen(
-        onExploreTap: () => _navigateToTab(0),
-        onWishlistTap: () => _navigateToTab(1),
-        onCartTap: () => _navigateToTab(2),
+      if (auth.isAuthenticated)
+        CustomerDashboardScreen(
+          onExploreTap: () => _navigateToTab(0),
+          onWishlistTap: () => _navigateToTab(1),
+          onCartTap: () => _navigateToTab(2),
+        ),
+    ];
+
+    final safeIndex = _currentIndex >= pages.length ? 0 : _currentIndex;
+
+    final navItems = [
+      const ModernNavItem(
+        icon: Icon(Icons.explore_outlined),
+        activeIcon: Icon(Icons.explore_rounded),
+        label: 'Explore',
       ),
+      ModernNavItem(
+        icon: const Icon(Icons.favorite_outline_rounded),
+        activeIcon: const Icon(Icons.favorite_rounded),
+        label: 'Wishlist',
+        badgeCount: wishlistCount,
+        badgeColor: AppTheme.accentColor,
+      ),
+      ModernNavItem(
+        icon: const Icon(Icons.shopping_bag_outlined),
+        activeIcon: const Icon(Icons.shopping_bag_rounded),
+        label: 'Cart',
+        badgeCount: cartQuantity,
+        badgeColor: AppTheme.primaryColor,
+      ),
+      const ModernNavItem(
+        icon: Icon(Icons.receipt_long_outlined),
+        activeIcon: Icon(Icons.receipt_long_rounded),
+        label: 'Orders',
+      ),
+      if (auth.isAuthenticated)
+        ModernNavItem(
+          icon: _buildNavProfileAvatar(auth, false),
+          activeIcon: _buildNavProfileAvatar(auth, true),
+          label: 'Dashboard',
+        ),
     ];
 
     return Scaffold(
       body: IndexedStack(
-        index: _currentIndex,
+        index: safeIndex,
         children: pages,
       ),
       bottomNavigationBar: ModernBottomNavBar(
-        currentIndex: _currentIndex,
+        currentIndex: safeIndex,
         onTap: _navigateToTab,
-        items: [
-          const ModernNavItem(
-            icon: Icon(Icons.explore_outlined),
-            activeIcon: Icon(Icons.explore_rounded),
-            label: 'Explore',
-          ),
-          ModernNavItem(
-            icon: const Icon(Icons.favorite_outline_rounded),
-            activeIcon: const Icon(Icons.favorite_rounded),
-            label: 'Wishlist',
-            badgeCount: wishlistCount,
-            badgeColor: AppTheme.accentColor,
-          ),
-          ModernNavItem(
-            icon: const Icon(Icons.shopping_bag_outlined),
-            activeIcon: const Icon(Icons.shopping_bag_rounded),
-            label: 'Cart',
-            badgeCount: cartQuantity,
-            badgeColor: AppTheme.primaryColor,
-          ),
-          const ModernNavItem(
-            icon: Icon(Icons.receipt_long_outlined),
-            activeIcon: Icon(Icons.receipt_long_rounded),
-            label: 'Orders',
-          ),
-          ModernNavItem(
-            icon: _buildNavProfileAvatar(auth, false),
-            activeIcon: _buildNavProfileAvatar(auth, true),
-            label: 'Dashboard',
-          ),
-        ],
+        items: navItems,
       ),
     );
   }

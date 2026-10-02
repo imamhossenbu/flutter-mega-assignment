@@ -55,39 +55,7 @@ class AdminProvider extends ChangeNotifier {
   StreamSubscription? _categorySub;
   StreamSubscription? _brandSub;
 
-  static final List<PromoCodeModel> _samplePromoCodes = [
-    PromoCodeModel(
-      id: 'promo_1',
-      code: 'MEGA20',
-      discountPercent: 0.20,
-      description: 'Grand Launch Sale - 20% off',
-      isActive: true,
-      minOrderAmount: 1000,
-      expiresAt: DateTime.now().add(const Duration(days: 30)),
-    ),
-    PromoCodeModel(
-      id: 'promo_2',
-      code: 'EID500',
-      discountPercent: 0.15,
-      description: 'Special Festivity Voucher',
-      isActive: true,
-      minOrderAmount: 2500,
-      expiresAt: DateTime.now().add(const Duration(days: 15)),
-    ),
-    PromoCodeModel(
-      id: 'promo_3',
-      code: 'FREESHIP',
-      discountPercent: 0.05,
-      description: 'Delivery Charge Discount Voucher',
-      isActive: true,
-      expiresAt: DateTime.now().add(const Duration(days: 60)),
-    ),
-  ];
-
-
-
-  List<PromoCodeModel> get promoCodes =>
-      _promoCodes.isEmpty ? _samplePromoCodes : _promoCodes;
+  List<PromoCodeModel> get promoCodes => _promoCodes;
   List<Map<String, dynamic>> get users => _users;
   List<CategoryModel> get categories => _categories;
   List<BrandModel> get brands => _brands;

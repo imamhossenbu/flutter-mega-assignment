@@ -72,8 +72,8 @@ class MyApp extends StatelessWidget {
           update: (ctx, repo, prev) => prev ?? ProductProvider(productRepository: repo),
         ),
         ChangeNotifierProxyProvider<PromoRepository, CartProvider>(
-          create: (ctx) => CartProvider(promoRepository: ctx.read<PromoRepository>(), seedSample: true),
-          update: (ctx, repo, prev) => prev ?? CartProvider(promoRepository: repo, seedSample: true),
+          create: (ctx) => CartProvider(promoRepository: ctx.read<PromoRepository>(), seedSample: false),
+          update: (ctx, repo, prev) => prev ?? CartProvider(promoRepository: repo, seedSample: false),
         ),
         ChangeNotifierProxyProvider<ProductRepository, WishlistProvider>(
           create: (ctx) => WishlistProvider(productRepository: ctx.read<ProductRepository>()),

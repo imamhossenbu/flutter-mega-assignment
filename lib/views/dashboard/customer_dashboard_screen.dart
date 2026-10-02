@@ -9,6 +9,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../admin/admin_main_screen.dart';
+import '../auth/login_screen.dart';
 import '../orders/orders_screen.dart';
 import '../profile/widgets/profile_management_dialogs.dart';
 
@@ -36,6 +37,51 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+
+    if (!auth.isAuthenticated) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(title: const Text('Customer Dashboard')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.person_outline_rounded, size: 40, color: AppTheme.primaryColor),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sign In Required',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please sign in to view your dashboard, manage orders, and track deliveries.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  ),
+                  icon: const Icon(Icons.login_rounded, size: 18),
+                  label: const Text('Sign In Now'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return _buildAuthenticatedCustomerDashboard(context, auth);
   }
@@ -140,11 +186,29 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
                         : null,
                   ),
                   child: auth.isUploadingPhoto
-                      ? const Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                      ? Center(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: CircularProgressIndicator(
+                                  value: auth.uploadProgress > 0 ? auth.uploadProgress : null,
+                                  color: Colors.white,
+                                  backgroundColor: Colors.white24,
+                                  strokeWidth: 3.5,
+                                ),
+                              ),
+                              Text(
+                                '${auth.uploadPercentage}%',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         )
                       : (auth.photoUrl.isEmpty
@@ -305,7 +369,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
             iconColor: Colors.green.shade600,
             title: 'Total Spent',
             value: AppConstants.formatCurrency(orderProvider.totalSpent),
-            subtitle: '${orderProvider.ordersCount} orders',
+            subtitle: '${orderProvider.nonCancelledOrdersCount} orders',
           ),
         ),
         const SizedBox(width: 10),
@@ -340,7 +404,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     required String subtitle,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -351,13 +415,20 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
         children: [
           Icon(icon, color: iconColor, size: 22),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textPrimary),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppTheme.textPrimary),
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
           ),
         ],

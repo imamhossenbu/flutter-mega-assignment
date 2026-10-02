@@ -40,20 +40,45 @@ class FirestorePromoRepository implements PromoRepository {
     final cleanCode = code.trim().toUpperCase();
     if (cleanCode.isEmpty) return null;
 
-    final doc = await _promoRef.doc(cleanCode).get();
-    if (!doc.exists || doc.data() == null) {
-      // Also try query by code field in case docId differs
+    try {
+      // 1. Direct document by ID in Firebase
+      final doc = await _promoRef.doc(cleanCode).get();
+      if (doc.exists && doc.data() != null) {
+        final promo = PromoCodeModel.fromMap(doc.data()!, doc.id);
+        if (promo.isValidForAmount(currentSubtotal)) {
+          return promo;
+        }
+        return null;
+      }
+
+      // 2. Query by 'code' field matching cleanCode
       final query = await _promoRef.where('code', isEqualTo: cleanCode).limit(1).get();
-      if (query.docs.isEmpty) return null;
-      final promo = PromoCodeModel.fromMap(query.docs.first.data(), query.docs.first.id);
-      return promo.isValidForAmount(currentSubtotal) ? promo : null;
+      if (query.docs.isNotEmpty) {
+        final promo = PromoCodeModel.fromMap(query.docs.first.data(), query.docs.first.id);
+        if (promo.isValidForAmount(currentSubtotal)) {
+          return promo;
+        }
+        return null;
+      }
+
+      // 3. Scan all docs in promo_codes collection for case-insensitive match
+      final allDocs = await _promoRef.get();
+      for (final d in allDocs.docs) {
+        final data = d.data();
+        final docCode = (data['code'] as String? ?? d.id).trim().toUpperCase();
+        if (docCode == cleanCode) {
+          final promo = PromoCodeModel.fromMap(data, d.id);
+          if (promo.isValidForAmount(currentSubtotal)) {
+            return promo;
+          }
+          return null;
+        }
+      }
+    } catch (_) {
+      // Firestore read error
     }
 
-    final promo = PromoCodeModel.fromMap(doc.data()!, doc.id);
-    if (!promo.isValidForAmount(currentSubtotal)) {
-      return null;
-    }
-    return promo;
+    return null;
   }
 
   @override

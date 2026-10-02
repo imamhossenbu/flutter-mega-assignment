@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/product_model.dart';
 import '../../providers/auth_provider.dart';
@@ -11,6 +12,7 @@ import '../all_products/all_products_screen.dart';
 import '../auth/login_screen.dart';
 import '../cart/cart_screen.dart';
 import '../dashboard/customer_dashboard_screen.dart';
+import '../details/product_details_screen.dart';
 import 'widgets/banner_slider.dart';
 import 'widgets/product_card.dart';
 
@@ -207,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Clean Search Bar (Tapping opens AllProductsScreen)
+                      // Clean Search Bar with Live Suggestions
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -219,6 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: TextField(
                           controller: _searchController,
                           textInputAction: TextInputAction.search,
+                          onChanged: (_) => setState(() {}),
                           onSubmitted: (val) {
                             if (val.trim().isNotEmpty) {
                               _navigateToCatalog(query: val.trim(), title: 'Search: ${val.trim()}');
@@ -228,20 +231,34 @@ class _HomeScreenState extends State<HomeScreen> {
                             hintText: 'Search products, brands, deals...',
                             hintStyle: const TextStyle(fontSize: 13.5, color: AppTheme.textMuted),
                             prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primaryColor, size: 22),
-                            suffixIcon: Container(
-                              margin: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: IconButton(
-                                icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
-                                onPressed: () {
-                                  _navigateToCatalog(
-                                    query: _searchController.text.trim().isNotEmpty ? _searchController.text.trim() : null,
-                                  );
-                                },
-                              ),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_searchController.text.isNotEmpty)
+                                  IconButton(
+                                    icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                    tooltip: 'Clear search',
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {});
+                                    },
+                                  ),
+                                Container(
+                                  margin: const EdgeInsets.fromLTRB(2, 6, 6, 6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                                    onPressed: () {
+                                      _navigateToCatalog(
+                                        query: _searchController.text.trim().isNotEmpty ? _searchController.text.trim() : null,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -251,6 +268,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
+
+                      // Live Search Results Dropdown Cards
+                      if (_searchController.text.trim().isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _buildLiveSearchResults(context, allProducts),
+                      ],
                     ],
                   ),
                 ),
@@ -522,6 +545,212 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLiveSearchResults(BuildContext context, List<ProductModel> allProducts) {
+    final query = _searchController.text.trim().toLowerCase();
+    final results = allProducts.where((p) {
+      final name = p.name.toLowerCase();
+      final brand = p.brand.toLowerCase();
+      final category = p.category.toLowerCase();
+      return name.contains(query) || brand.contains(query) || category.contains(query);
+    }).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  results.isEmpty ? 'No matching products' : 'Found ${results.length} item(s)',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                if (results.isNotEmpty)
+                  InkWell(
+                    onTap: () {
+                      _navigateToCatalog(
+                        query: _searchController.text.trim(),
+                        title: 'Search: ${_searchController.text.trim()}',
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Text(
+                        'View All in Catalog',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          if (results.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.search_off_rounded, size: 36, color: Colors.grey.shade400),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No products found matching "${_searchController.text.trim()}"',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                children: results.take(5).map((product) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Material(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ProductDetailsScreen(product: product),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            children: [
+                              // Product Thumbnail
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  color: Colors.white,
+                                  child: CachedNetworkImage(
+                                    imageUrl: product.imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, _, _) => const Icon(
+                                      Icons.image_outlined,
+                                      size: 20,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              // Product Info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      product.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          product.brand.isNotEmpty ? product.brand : product.category,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.textMuted,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        if (product.rating > 0) ...[
+                                          const Text(' • ', style: TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                                          const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            product.rating.toStringAsFixed(1),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Price and arrow
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    AppConstants.formatCurrency(product.price),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  ),
+                                  if (product.discountPercent > 0)
+                                    Text(
+                                      AppConstants.formatCurrency(product.originalPrice),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: AppTheme.textMuted,
+                                        decoration: TextDecoration.lineThrough,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
       ),
     );
   }

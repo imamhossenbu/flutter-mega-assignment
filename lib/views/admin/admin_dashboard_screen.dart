@@ -309,9 +309,14 @@ class AdminDashboardScreen extends StatelessWidget {
                         children: [
                           const Text('Total Revenue', style: TextStyle(fontSize: 12, color: Colors.white60)),
                           const SizedBox(height: 4),
-                          Text(
-                            AppConstants.formatCurrency(orderProvider.totalRevenue),
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              AppConstants.formatCurrency(orderProvider.totalRevenue),
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
+                            ),
                           ),
                         ],
                       ),
@@ -735,7 +740,15 @@ class AdminDashboardScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textPrimary),
+              ),
+            ),
             const SizedBox(height: 4),
             Text(subtitle, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
           ],
@@ -881,53 +894,62 @@ class AdminDashboardScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF7ED),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFFEDD5)),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFFEDD5)),
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 20),
                     ),
-                    child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C), size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Low Stock Alerts',
-                            style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          Row(
+                            children: [
+                              const Text(
+                                'Low Stock Alerts',
+                                style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEF4444),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${lowStockItems.length}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${lowStockItems.length}',
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
-                            ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Items need restocking to prevent lost sales',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        'Items need restocking to prevent lost sales',
-                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 6),
               TextButton(
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 onPressed: () => Navigator.push(
                   context,

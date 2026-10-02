@@ -138,11 +138,29 @@ class ProfileScreen extends StatelessWidget {
                                 : null,
                           ),
                           child: auth.isUploadingPhoto
-                              ? const Center(
-                                  child: SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                              ? Center(
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 42,
+                                        height: 42,
+                                        child: CircularProgressIndicator(
+                                          value: auth.uploadProgress > 0 ? auth.uploadProgress : null,
+                                          color: Colors.white,
+                                          backgroundColor: Colors.white24,
+                                          strokeWidth: 3.5,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${auth.uploadPercentage}%',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 )
                               : (auth.photoUrl.isEmpty

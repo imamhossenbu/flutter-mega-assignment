@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import '../core/constants/app_constants.dart';
 import '../models/product_model.dart';
 import '../repositories/product_repository.dart';
 
@@ -19,18 +18,7 @@ class WishlistProvider extends ChangeNotifier {
   bool isInWishlist(String productId) => _wishlistMap.containsKey(productId);
 
   WishlistProvider({ProductRepository? productRepository})
-      : _productRepository = productRepository ?? FirestoreProductRepository() {
-    _initSampleWishlist();
-  }
-
-  void _initSampleWishlist() {
-    if (AppConstants.initialProducts.length >= 4) {
-      final p1 = AppConstants.initialProducts[2];
-      final p2 = AppConstants.initialProducts[3];
-      _wishlistMap[p1.id] = p1;
-      _wishlistMap[p2.id] = p2;
-    }
-  }
+      : _productRepository = productRepository ?? FirestoreProductRepository();
 
   void updateUserId(String newUserId) {
     if (_userId == newUserId) return;

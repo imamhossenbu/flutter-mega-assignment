@@ -32,6 +32,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<OrderProvider>().initAdminOrdersStream();
+      }
+    });
   }
 
   @override
@@ -49,6 +54,13 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         title: const Text('Order Management'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Orders',
+            onPressed: () => context.read<OrderProvider>().initAdminOrdersStream(),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Container(
@@ -115,13 +127,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> with SingleTicker
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            itemCount: filtered.length,
-            itemBuilder: (context, index) {
-              final order = filtered[index];
-              return _buildAdminOrderCard(context, order, orderProvider);
-            },
+          return RefreshIndicator(
+            onRefresh: () => orderProvider.refreshAdminOrders(),
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              itemCount: filtered.length,
+              itemBuilder: (context, index) {
+                final order = filtered[index];
+                return _buildAdminOrderCard(context, order, orderProvider);
+              },
+            ),
           );
         }).toList(),
       ),

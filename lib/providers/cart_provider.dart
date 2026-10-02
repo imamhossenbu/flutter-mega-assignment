@@ -148,19 +148,28 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? _promoValidationMessage;
+  String? get promoValidationMessage => _promoValidationMessage;
+
   Future<void> clearCart() async {
     _items.clear();
     _appliedPromoCode = null;
     _promoDiscountFraction = 0.0;
     _appliedPromo = null;
+    _promoValidationMessage = null;
     notifyListeners();
   }
 
   Future<bool> applyPromoCode(String code) async {
     final clean = code.trim().toUpperCase();
-    if (clean.isEmpty) return false;
+    if (clean.isEmpty) {
+      _promoValidationMessage = 'Please enter a promo code.';
+      notifyListeners();
+      return false;
+    }
 
     _isValidatingPromo = true;
+    _promoValidationMessage = null;
     notifyListeners();
     try {
       final promo = await _promoRepository.validatePromoCode(clean, subtotal);
@@ -169,14 +178,34 @@ class CartProvider extends ChangeNotifier {
         _appliedPromoCode = promo.code;
         _promoDiscountFraction = promo.discountFraction;
         _isValidatingPromo = false;
+        _promoValidationMessage = null;
         notifyListeners();
         return true;
       }
+
+      final allPromos = await _promoRepository.getPromoCodes();
+      final matching = allPromos.where((p) => p.code.toUpperCase() == clean).firstOrNull;
+      if (matching != null) {
+        if (!matching.isActive) {
+          _promoValidationMessage = 'Promo code "$clean" is currently inactive.';
+        } else if (matching.expiresAt != null && DateTime.now().isAfter(matching.expiresAt!)) {
+          _promoValidationMessage = 'Promo code "$clean" has expired.';
+        } else if (matching.minOrderAmount != null && subtotal < matching.minOrderAmount!) {
+          _promoValidationMessage =
+              'Minimum order of ৳${matching.minOrderAmount!.toStringAsFixed(0)} required for "$clean".';
+        } else {
+          _promoValidationMessage = 'Promo code "$clean" cannot be applied to this order.';
+        }
+      } else {
+        _promoValidationMessage = 'Invalid promo code. Please enter a valid voucher code.';
+      }
+
       _isValidatingPromo = false;
       notifyListeners();
       return false;
     } catch (_) {
       _isValidatingPromo = false;
+      _promoValidationMessage = 'Failed to validate promo code. Please try again.';
       notifyListeners();
       return false;
     }
@@ -186,6 +215,7 @@ class CartProvider extends ChangeNotifier {
     _appliedPromoCode = null;
     _promoDiscountFraction = 0.0;
     _appliedPromo = null;
+    _promoValidationMessage = null;
     notifyListeners();
   }
 

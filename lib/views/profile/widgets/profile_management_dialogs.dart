@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../providers/auth_provider.dart';
@@ -41,20 +42,12 @@ class ProfileManagementDialogs {
                 subtitle: const Text('Select a picture from your device storage'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  AppToast.showInfo(context, 'Uploading profile photo... ⏳', title: 'Uploading');
-                  final url = await auth.uploadProfileImage(source: ImageSource.gallery);
-                  if (context.mounted) {
-                    if (url != null) {
-                      AppToast.showSuccess(context, 'Profile picture updated! ✨', title: 'Profile Updated');
-                      onUpdated?.call();
-                    } else {
-                      AppToast.showError(
-                        context,
-                        'Upload failed. You can also paste an image URL.',
-                        title: 'Upload Failed',
-                      );
-                    }
-                  }
+                  await _startUploadWithProgressDialog(
+                    context,
+                    auth,
+                    source: ImageSource.gallery,
+                    onUpdated: onUpdated,
+                  );
                 },
               ),
               ListTile(
@@ -70,16 +63,12 @@ class ProfileManagementDialogs {
                 subtitle: const Text('Use your device camera to take a new picture'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  AppToast.showInfo(context, 'Uploading profile photo... ⏳', title: 'Uploading');
-                  final url = await auth.uploadProfileImage(source: ImageSource.camera);
-                  if (context.mounted) {
-                    if (url != null) {
-                      AppToast.showSuccess(context, 'Profile picture updated! ✨', title: 'Profile Updated');
-                      onUpdated?.call();
-                    } else {
-                      AppToast.showError(context, 'Failed to capture photo.', title: 'Upload Failed');
-                    }
-                  }
+                  await _startUploadWithProgressDialog(
+                    context,
+                    auth,
+                    source: ImageSource.camera,
+                    onUpdated: onUpdated,
+                  );
                 },
               ),
               ListTile(
@@ -129,6 +118,115 @@ class ProfileManagementDialogs {
         ),
       ),
     );
+  }
+
+  static Future<void> _startUploadWithProgressDialog(
+    BuildContext context,
+    AuthProvider auth, {
+    required ImageSource source,
+    VoidCallback? onUpdated,
+  }) async {
+    // 1. Pick image from Gallery or Camera first - no loading yet
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1200,
+      maxHeight: 1200,
+    );
+    if (picked == null) {
+      // User cancelled picker, don't show loading dialog
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    // 2. Image selected! Now show upload progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dlgCtx) => Consumer<AuthProvider>(
+        builder: (_, a, _) {
+          final pct = a.uploadPercentage;
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: CircularProgressIndicator(
+                          value: a.uploadProgress > 0 ? a.uploadProgress : null,
+                          strokeWidth: 5,
+                          color: AppTheme.primaryColor,
+                          backgroundColor: AppTheme.primaryColor.withOpacity(0.12),
+                        ),
+                      ),
+                      Text(
+                        '$pct%',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Uploading Image',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    pct < 20
+                        ? 'Preparing image file...'
+                        : pct < 90
+                            ? 'Uploading to cloud server... ($pct%)'
+                            : pct < 100
+                                ? 'Finalizing photo... ($pct%)'
+                                : 'Complete! Updating profile...',
+                    style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: a.uploadProgress > 0 ? a.uploadProgress : null,
+                      minHeight: 6,
+                      backgroundColor: Colors.blue.shade50,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    final url = await auth.uploadProfileImage(pickedFile: picked);
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      if (url != null) {
+        AppToast.showSuccess(context, 'Profile picture updated! ✨', title: 'Profile Updated');
+        onUpdated?.call();
+      } else {
+        AppToast.showError(
+          context,
+          'Upload failed. You can also paste an image URL.',
+          title: 'Upload Failed',
+        );
+      }
+    }
   }
 
   static void _showImageUrlDialog(

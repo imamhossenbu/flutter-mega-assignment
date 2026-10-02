@@ -22,6 +22,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  final _scrollController = ScrollController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _districtController = TextEditingController();
@@ -35,13 +36,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = context.read<AuthProvider>();
       if (auth.isAuthenticated) {
         context.read<AddressProvider>().initAddresses(auth.userId);
+        if (mounted) {
+          _selectDefaultAddressIfAvailable();
+        }
       }
       _prefillUserData();
     });
+  }
+
+  void _selectDefaultAddressIfAvailable() {
+    final addressProvider = context.read<AddressProvider>();
+    if (addressProvider.addresses.isNotEmpty && _selectedAddressId == null && !_useNewAddress) {
+      final defaultAddr = addressProvider.addresses.firstWhere(
+        (a) => a.isDefault,
+        orElse: () => addressProvider.addresses.first,
+      );
+      _onAddressSelected(defaultAddr);
+    }
   }
 
   void _prefillUserData() {
@@ -59,6 +74,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _districtController.dispose();
@@ -81,7 +97,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder() async {
     final auth = context.read<AuthProvider>();
-    if (auth.isGuest) {
+    if (!auth.isAuthenticated) {
       AppToast.showWarning(
         context,
         'Please sign in to place an order',
@@ -94,25 +110,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    if (!_formKey.currentState!.validate()) {
-      AppToast.showWarning(context, 'Please complete the address form properly.');
+    final cart = context.read<CartProvider>();
+    if (cart.items.isEmpty) {
+      AppToast.showWarning(context, 'Your cart is empty. Please add items to checkout.');
       return;
     }
 
-    final cart = context.read<CartProvider>();
-    final orderProvider = context.read<OrderProvider>();
     final addressProvider = context.read<AddressProvider>();
+    final hasSaved = addressProvider.addresses.isNotEmpty;
 
-    final cleanPhone = AppConstants.normalizePhone(_phoneController.text.trim());
-    final shippingAddress =
+    // If using new address form or no saved address, validate the form fields
+    if (!hasSaved || _useNewAddress) {
+      if (!_formKey.currentState!.validate()) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+        AppToast.showWarning(
+          context,
+          'Please complete all required address fields properly.',
+          title: 'Address Incomplete',
+        );
+        return;
+      }
+    }
+
+    final orderProvider = context.read<OrderProvider>();
+
+    if (auth.isAuthenticated && auth.userId.isNotEmpty) {
+      orderProvider.updateUserId(auth.userId);
+    }
+
+    String customerName = _nameController.text.trim();
+    String customerPhone = AppConstants.normalizePhone(_phoneController.text.trim());
+    String shippingAddress =
         '${_streetController.text.trim()}, ${_districtController.text.trim()}';
+
+    // If using a saved address, pull directly from the selected address
+    if (hasSaved && !_useNewAddress) {
+      final selectedAddr = addressProvider.addresses.firstWhere(
+        (a) => a.id == _selectedAddressId,
+        orElse: () => addressProvider.addresses.firstWhere(
+          (a) => a.isDefault,
+          orElse: () => addressProvider.addresses.first,
+        ),
+      );
+      customerName = selectedAddr.name;
+      customerPhone = AppConstants.normalizePhone(selectedAddr.phone);
+      shippingAddress = selectedAddr.fullAddress;
+    }
 
     // Optionally save address to user's address book
     if (_useNewAddress && _saveAddress && auth.isAuthenticated) {
       final newAddr = AddressModel(
         id: '',
-        name: _nameController.text.trim(),
-        phone: cleanPhone,
+        name: customerName,
+        phone: customerPhone,
         district: _districtController.text.trim(),
         detailedAddress: _streetController.text.trim(),
         isDhaka: _isDhaka,
@@ -125,31 +181,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ? AppConstants.deliveryFeeDhaka
         : AppConstants.deliveryFeeOutsideDhaka;
 
-    final order = await orderProvider.placeOrder(
-      cartItems: cart.items.toList(),
-      customerName: _nameController.text.trim(),
-      customerPhone: cleanPhone,
-      shippingAddress: shippingAddress,
-      deliveryCharge: deliveryCharge,
-      promoCode: cart.appliedPromo,
-      subtotal: cart.subtotal,
-      discount: cart.discountAmount,
-      shipping: deliveryCharge,
-      tax: cart.taxAmount,
-      grandTotal: cart.grandTotal,
-    );
-
-    if (!mounted) return;
-
-    if (order != null) {
-      cart.clearCart();
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => OrderSuccessScreen(order: order)),
+    try {
+      final order = await orderProvider.placeOrder(
+        cartItems: cart.items.toList(),
+        customerName: customerName,
+        customerPhone: customerPhone,
+        shippingAddress: shippingAddress,
+        deliveryCharge: deliveryCharge,
+        promoCode: cart.appliedPromo,
+        subtotal: cart.subtotal,
+        discount: cart.discountAmount,
+        shipping: deliveryCharge,
+        tax: cart.taxAmount,
+        grandTotal: cart.grandTotal,
       );
-    } else {
+
+      if (!mounted) return;
+
+      if (order != null) {
+        cart.clearCart();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => OrderSuccessScreen(order: order)),
+        );
+      } else {
+        final err = orderProvider.errorMessage ??
+            'Failed to place order. Please review your cart and try again.';
+        AppToast.showError(context, err, title: 'Order Placement Error');
+      }
+    } catch (e) {
+      if (!mounted) return;
       final err = orderProvider.errorMessage ??
-          'Failed to place order. Please review your cart and try again.';
-      AppToast.showError(context, err, title: 'Order Placement Error');
+          e.toString().replaceFirst('Exception: ', '');
+      AppToast.showError(context, err, title: 'Order Failed');
     }
   }
 
@@ -159,6 +222,51 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final orderProvider = context.watch<OrderProvider>();
     final addressProvider = context.watch<AddressProvider>();
     final auth = context.watch<AuthProvider>();
+
+    if (!auth.isAuthenticated) {
+      return Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(title: const Text('Checkout'), centerTitle: true),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_outline_rounded, size: 40, color: AppTheme.primaryColor),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sign In Required',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please sign in or create an account to proceed with checkout and place your order.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  ),
+                  icon: const Icon(Icons.login_rounded, size: 18),
+                  label: const Text('Sign In to Continue'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     final savedAddresses = addressProvider.addresses;
     final hasSaved = savedAddresses.isNotEmpty;
@@ -170,42 +278,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Guest Warning
-              if (auth.isGuest) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.warning.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppTheme.warning.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: AppTheme.warning),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Sign in to place your order with verified account.',
-                          style: TextStyle(fontSize: 13, color: AppTheme.textPrimary),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                        ),
-                        child: const Text('Sign In'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
+
 
               // Delivery Address Section
               _buildSectionHeader('Delivery Address', Icons.location_on_outlined),
@@ -761,8 +841,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
       ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -778,38 +858,50 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           top: false,
           child: SizedBox(
             width: double.infinity,
-            height: 52,
+            height: 50,
             child: ElevatedButton(
               onPressed: orderProvider.isPlacingOrder ? null : _placeOrder,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: orderProvider.isPlacingOrder
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: orderProvider.isPlacingOrder
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.2,
+                            ),
                           ),
+                          SizedBox(width: 10),
+                          Text(
+                            'Placing Order...',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        'Confirm Order (COD) • ${AppConstants.formatCurrency(cart.grandTotal)}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
                         ),
-                        SizedBox(width: 12),
-                        Text('Confirming Order via Secure Transaction...'),
-                      ],
-                    )
-                  : Text(
-                      'Confirm Order (COD) • ${AppConstants.formatCurrency(cart.grandTotal)}',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
                       ),
-                    ),
+              ),
             ),
           ),
         ),

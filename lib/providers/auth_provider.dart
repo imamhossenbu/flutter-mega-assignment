@@ -16,16 +16,19 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   Map<String, dynamic>? _profile;
   bool _isUploadingPhoto = false;
+  double _uploadProgress = 0.0;
 
   User? get user => _user;
   AuthStatus get status => _status;
   String? get errorMessage => _errorMessage;
   Map<String, dynamic>? get profile => _profile;
   bool get isUploadingPhoto => _isUploadingPhoto;
+  double get uploadProgress => _uploadProgress;
+  int get uploadPercentage => (_uploadProgress * 100).toInt().clamp(0, 100);
 
   String get userId => _user?.uid ?? '';
   String get displayName =>
-      _profile?['name'] as String? ?? _user?.displayName ?? 'Guest Shopper';
+      _profile?['name'] as String? ?? _user?.displayName ?? '';
   String get email => _user?.email ?? '';
   String get photoUrl => _profile?['photoUrl'] as String? ?? _user?.photoURL ?? '';
   String get phone => _profile?['phone'] as String? ?? '';
@@ -160,26 +163,40 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> uploadProfileImage({ImageSource source = ImageSource.gallery}) async {
+  Future<String?> uploadProfileImage({
+    ImageSource source = ImageSource.gallery,
+    XFile? pickedFile,
+  }) async {
     if (userId.isEmpty) return null;
+
+    final picked = pickedFile ?? await CloudinaryService.instance.pickImage(source: source);
+    if (picked == null) {
+      // User cancelled picker, do not enter loading state
+      return null;
+    }
+
     _isUploadingPhoto = true;
+    _uploadProgress = 0.10;
     notifyListeners();
 
     try {
-      final picked = await CloudinaryService.instance.pickImage(source: source);
-      if (picked == null) {
-        _isUploadingPhoto = false;
-        notifyListeners();
-        return null;
-      }
-
       final bytes = await picked.readAsBytes();
       final filename = 'avatar_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final photoUrl = await CloudinaryService.instance.uploadImageBytes(bytes, filename: filename);
+      final photoUrl = await CloudinaryService.instance.uploadImageBytes(
+        bytes,
+        filename: filename,
+        onProgress: (p) {
+          _uploadProgress = p;
+          notifyListeners();
+        },
+      );
 
       if (photoUrl != null && photoUrl.isNotEmpty) {
+        _uploadProgress = 1.0;
+        notifyListeners();
         await updateProfile(photoUrl: photoUrl);
         _isUploadingPhoto = false;
+        _uploadProgress = 0.0;
         notifyListeners();
         return photoUrl;
       }
@@ -187,6 +204,7 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('Profile photo upload error: $e');
     } finally {
       _isUploadingPhoto = false;
+      _uploadProgress = 0.0;
       notifyListeners();
     }
     return null;

@@ -98,15 +98,18 @@ class OrderProvider extends ChangeNotifier {
 
   static List<OrderModel> get sampleOrders => _sampleOrders;
 
-  List<OrderModel> get orders => _orders.isEmpty ? _sampleOrders : _orders;
-  List<OrderModel> get allOrders => _allOrders.isEmpty ? _sampleOrders : _allOrders;
+  List<OrderModel> get orders => _orders;
+  List<OrderModel> get allOrders => _allOrders;
   bool get isLoading => _isLoading;
   bool get isPlacingOrder => _isPlacingOrder;
   String? get errorMessage => _errorMessage;
 
-  // Customer metrics
-  double get totalSpent => orders.fold(0.0, (sum, o) => sum + o.grandTotal);
+  // Customer metrics (excludes cancelled orders)
+  double get totalSpent => orders.fold(
+      0.0, (sum, o) => sum + (o.status != OrderStatus.cancelled ? o.grandTotal : 0.0));
   int get ordersCount => orders.length;
+  int get nonCancelledOrdersCount =>
+      orders.where((o) => o.status != OrderStatus.cancelled).length;
   int get activeOrdersCount => orders
       .where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled)
       .length;
@@ -116,7 +119,7 @@ class OrderProvider extends ChangeNotifier {
         (o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled,
       );
     } catch (_) {
-      return orders.isNotEmpty ? orders.first : null;
+      return null;
     }
   }
 
@@ -146,7 +149,7 @@ class OrderProvider extends ChangeNotifier {
 
   void initAdminOrdersStream() {
     _allOrdersSub?.cancel();
-    _allOrdersSub = _orderRepository.streamAllOrders(limit: 50).listen(
+    _allOrdersSub = _orderRepository.streamAllOrders(limit: 100).listen(
       (orders) {
         _allOrders = orders;
         notifyListeners();
@@ -155,6 +158,16 @@ class OrderProvider extends ChangeNotifier {
         debugPrint('Admin orders stream error: $e');
       },
     );
+  }
+
+  Future<void> refreshAdminOrders() async {
+    try {
+      final list = await _orderRepository.getAllOrders(limit: 100);
+      _allOrders = list;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Admin orders refresh error: $e');
+    }
   }
 
   void _listenToOrders() {
@@ -256,6 +269,18 @@ class OrderProvider extends ChangeNotifier {
         orderId: orderId,
         userId: _userId,
       );
+
+      // Optimistically update local lists so totalSpent and order counts recalculate immediately
+      final idx = _orders.indexWhere((o) => o.id == orderId);
+      if (idx != -1) {
+        _orders[idx] = _orders[idx].copyWith(status: OrderStatus.cancelled);
+      }
+      final adminIdx = _allOrders.indexWhere((o) => o.id == orderId);
+      if (adminIdx != -1) {
+        _allOrders[adminIdx] = _allOrders[adminIdx].copyWith(status: OrderStatus.cancelled);
+      }
+      notifyListeners();
+
       return true;
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
@@ -272,6 +297,14 @@ class OrderProvider extends ChangeNotifier {
         orderId: orderId,
         newStatus: newStatus,
       );
+      final idx = _allOrders.indexWhere((o) => o.id == orderId);
+      if (idx != -1) {
+        _allOrders[idx] = _allOrders[idx].copyWith(
+          status: newStatus,
+          updatedAt: DateTime.now(),
+        );
+      }
+      notifyListeners();
       return true;
     } catch (e) {
       debugPrint('Error updating order status: $e');

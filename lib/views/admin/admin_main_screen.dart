@@ -25,6 +25,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<OrderProvider>().initAdminOrdersStream();
+      }
+    });
   }
 
   @override

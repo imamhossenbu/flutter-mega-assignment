@@ -254,6 +254,7 @@ class FirestoreOrderRepository implements OrderRepository {
     required String userId,
   }) async {
     await _firestore.runTransaction((transaction) async {
+      // 1. ALL READS FIRST: Read order document
       final orderRef = _ordersRef.doc(orderId);
       final orderSnap = await transaction.get(orderRef);
       if (!orderSnap.exists || orderSnap.data() == null) {
@@ -272,27 +273,41 @@ class FirestoreOrderRepository implements OrderRepository {
         );
       }
 
-      // Restore stock for all items
+      // Read all product documents FIRST before writing anything
       final rawItems = orderData['items'] as List<dynamic>? ?? [];
+      final productSnapshots = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+      final itemQuantities = <String, int>{};
+
       for (final raw in rawItems) {
         final itemMap = raw as Map<String, dynamic>;
         final pId = itemMap['productId'] as String?;
         final qty = (itemMap['quantity'] as num?)?.toInt() ?? 0;
         if (pId != null && qty > 0) {
-          final pRef = _firestore.collection('products').doc(pId);
-          final pSnap = await transaction.get(pRef);
-          if (pSnap.exists && pSnap.data() != null) {
-            final pData = pSnap.data()!;
-            final currentStock = (pData['stockCount'] as num?)?.toInt() ?? 0;
-            transaction.update(pRef, {
-              'stockCount': currentStock + qty,
-              'inStock': true,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
+          itemQuantities[pId] = (itemQuantities[pId] ?? 0) + qty;
+          if (!productSnapshots.containsKey(pId)) {
+            final pRef = _firestore.collection('products').doc(pId);
+            final pSnap = await transaction.get(pRef);
+            productSnapshots[pId] = pSnap;
           }
         }
       }
 
+      // 2. ALL WRITES AFTER READS: Restore stock for all products
+      itemQuantities.forEach((pId, qty) {
+        final pSnap = productSnapshots[pId];
+        if (pSnap != null && pSnap.exists && pSnap.data() != null) {
+          final pData = pSnap.data()!;
+          final currentStock = (pData['stockCount'] as num?)?.toInt() ?? 0;
+          final pRef = _firestore.collection('products').doc(pId);
+          transaction.update(pRef, {
+            'stockCount': currentStock + qty,
+            'inStock': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      });
+
+      // Update order status
       transaction.update(orderRef, {
         'status': 'Cancelled',
         'updatedAt': FieldValue.serverTimestamp(),
@@ -306,6 +321,7 @@ class FirestoreOrderRepository implements OrderRepository {
     required OrderStatus newStatus,
   }) async {
     await _firestore.runTransaction((transaction) async {
+      // 1. ALL READS FIRST: Read order document
       final orderRef = _ordersRef.doc(orderId);
       final orderSnap = await transaction.get(orderRef);
       if (!orderSnap.exists || orderSnap.data() == null) {
@@ -319,7 +335,10 @@ class FirestoreOrderRepository implements OrderRepository {
         );
       }
 
-      // If transition is to Cancelled, restore stock
+      // If transition is to Cancelled, read product documents FIRST before any writes
+      final productSnapshots = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+      final itemQuantities = <String, int>{};
+
       if (newStatus == OrderStatus.cancelled) {
         final rawItems = orderSnap.data()!['items'] as List<dynamic>? ?? [];
         for (final raw in rawItems) {
@@ -327,19 +346,31 @@ class FirestoreOrderRepository implements OrderRepository {
           final pId = itemMap['productId'] as String?;
           final qty = (itemMap['quantity'] as num?)?.toInt() ?? 0;
           if (pId != null && qty > 0) {
-            final pRef = _firestore.collection('products').doc(pId);
-            final pSnap = await transaction.get(pRef);
-            if (pSnap.exists && pSnap.data() != null) {
-              final pData = pSnap.data()!;
-              final currentStock = (pData['stockCount'] as num?)?.toInt() ?? 0;
-              transaction.update(pRef, {
-                'stockCount': currentStock + qty,
-                'inStock': true,
-                'updatedAt': FieldValue.serverTimestamp(),
-              });
+            itemQuantities[pId] = (itemQuantities[pId] ?? 0) + qty;
+            if (!productSnapshots.containsKey(pId)) {
+              final pRef = _firestore.collection('products').doc(pId);
+              final pSnap = await transaction.get(pRef);
+              productSnapshots[pId] = pSnap;
             }
           }
         }
+      }
+
+      // 2. ALL WRITES AFTER READS:
+      if (newStatus == OrderStatus.cancelled) {
+        itemQuantities.forEach((pId, qty) {
+          final pSnap = productSnapshots[pId];
+          if (pSnap != null && pSnap.exists && pSnap.data() != null) {
+            final pData = pSnap.data()!;
+            final currentStock = (pData['stockCount'] as num?)?.toInt() ?? 0;
+            final pRef = _firestore.collection('products').doc(pId);
+            transaction.update(pRef, {
+              'stockCount': currentStock + qty,
+              'inStock': true,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        });
       }
 
       transaction.update(orderRef, {

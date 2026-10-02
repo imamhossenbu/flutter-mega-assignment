@@ -96,37 +96,57 @@ class _CartScreenState extends State<CartScreen> {
                           const SizedBox(height: 10),
                           if (cartProvider.appliedPromoCode != null)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: AppTheme.success.withOpacity(0.1),
+                                color: AppTheme.success.withOpacity(0.08),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.success.withOpacity(0.3)),
+                                border: Border.all(color: AppTheme.success.withOpacity(0.35)),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.check_circle, color: AppTheme.success, size: 18),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Code "${cartProvider.appliedPromoCode}" Applied (${(cartProvider.promoDiscountPercent * 100).toInt()}% OFF)',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                          color: AppTheme.success,
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 20),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Voucher "${cartProvider.appliedPromoCode}" Applied',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                  color: AppTheme.success,
+                                                ),
+                                              ),
+                                              Text(
+                                                '${(cartProvider.promoDiscountPercent * 100).toInt()}% Discount: -${AppConstants.formatCurrency(cartProvider.discountAmount)}',
+                                                style: const TextStyle(
+                                                  fontSize: 11.5,
+                                                  color: AppTheme.textSecondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                  InkWell(
-                                    onTap: () => cartProvider.removePromoCode(),
-                                    child: const Icon(Icons.close_rounded, size: 18, color: AppTheme.error),
+                                  IconButton(
+                                    tooltip: 'Remove Voucher',
+                                    icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.error),
+                                    onPressed: () {
+                                      cartProvider.removePromoCode();
+                                      AppToast.showInfo(context, 'Promo voucher removed');
+                                    },
                                   ),
                                 ],
                               ),
                             )
-                          else
+                          else ...[
                             Row(
                               children: [
                                 Expanded(
@@ -138,36 +158,64 @@ class _CartScreenState extends State<CartScreen> {
                                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                                       filled: true,
                                       fillColor: AppTheme.background,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
+                                      ),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 ElevatedButton(
-                                  onPressed: () async {
-                                    final success = await cartProvider.applyPromoCode(_couponController.text);
-                                    if (!context.mounted) return;
-                                    if (success) {
-                                      _couponController.clear();
-                                      AppToast.showSuccess(
-                                        context,
-                                        'Promo voucher applied successfully! 🎉',
-                                        title: 'Discount Applied',
-                                      );
-                                    } else {
-                                      AppToast.showError(
-                                        context,
-                                        'Invalid promo code. Try "MEGA20" or "WELCOME10"',
-                                        title: 'Invalid Voucher',
-                                      );
-                                    }
-                                  },
+                                  onPressed: cartProvider.isValidatingPromo
+                                      ? null
+                                      : () async {
+                                          final code = _couponController.text.trim();
+                                          if (code.isEmpty) {
+                                            AppToast.showError(context, 'Please enter a voucher code', title: 'Empty Code');
+                                            return;
+                                          }
+                                          final success = await cartProvider.applyPromoCode(code);
+                                          if (!context.mounted) return;
+                                          if (success) {
+                                            _couponController.clear();
+                                            AppToast.showSuccess(
+                                              context,
+                                              'Promo voucher applied successfully! 🎉',
+                                              title: 'Discount Applied',
+                                            );
+                                          } else {
+                                            AppToast.showError(
+                                              context,
+                                              cartProvider.promoValidationMessage ??
+                                                  'Invalid promo code. Please enter a valid voucher.',
+                                              title: 'Invalid Voucher',
+                                            );
+                                          }
+                                        },
                                   style: ElevatedButton.styleFrom(
                                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
-                                  child: const Text('Apply'),
+                                  child: cartProvider.isValidatingPromo
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : const Text('Apply'),
                                 ),
                               ],
                             ),
+                          ],
                         ],
                       ),
                     ),

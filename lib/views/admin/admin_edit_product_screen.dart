@@ -38,6 +38,7 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
   bool _inStock = true;
   bool _isSaving = false;
   bool _isUploadingImage = false;
+  double _imageUploadProgress = 0.0;
 
   Future<void> _pickAndUploadImage() async {
     try {
@@ -51,17 +52,24 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
 
       if (picked == null) return;
 
-      setState(() => _isUploadingImage = true);
+      setState(() {
+        _isUploadingImage = true;
+        _imageUploadProgress = 0.10;
+      });
 
       final bytes = await picked.readAsBytes();
       final uploadedUrl = await CloudinaryService.instance.uploadImageBytes(
         bytes,
         filename: picked.name,
+        onProgress: (p) {
+          if (mounted) setState(() => _imageUploadProgress = p);
+        },
       );
 
       if (uploadedUrl != null && mounted) {
         setState(() {
           _imageUrlController.text = uploadedUrl;
+          _imageUploadProgress = 1.0;
         });
         AppToast.showSuccess(
           context,
@@ -74,7 +82,12 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
         _showCloudinaryConfigDialog(context, error: e.toString());
       }
     } finally {
-      if (mounted) setState(() => _isUploadingImage = false);
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+          _imageUploadProgress = 0.0;
+        });
+      }
     }
   }
 
@@ -85,11 +98,31 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20),
         title: Row(
-          children: const [
-            Icon(Icons.cloud_queue_rounded, color: AppTheme.primaryColor),
-            SizedBox(width: 8),
-            Text('Cloudinary Settings'),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cloud_queue_rounded, color: AppTheme.primaryColor, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Cloudinary Settings',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -99,7 +132,7 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
             children: [
               if (error != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppTheme.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -112,33 +145,52 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
-              const Text(
-                'Uses Unsigned Upload Preset. Configure via .env or update values below.',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Text(
+                  'Uses Unsigned Upload Preset. Configure via .env or update values below.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.4),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: cloudNameCtrl,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  labelText: 'Cloud Name *',
+                  hintText: 'e.g. your_cloud_name',
+                  prefixIcon: const Icon(Icons.cloud_outlined, size: 20),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: cloudNameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Cloud Name *',
-                  hintText: 'e.g. your_cloud_name',
-                  prefixIcon: Icon(Icons.cloud_outlined),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
                 controller: presetCtrl,
-                decoration: const InputDecoration(
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
                   labelText: 'Upload Preset *',
                   hintText: 'e.g. flutter_upload (Unsigned)',
-                  prefixIcon: Icon(Icons.tune_rounded),
+                  prefixIcon: const Icon(Icons.tune_rounded, size: 20),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
+          ),
           ElevatedButton(
             onPressed: () {
               CloudinaryService.instance.configure(
@@ -148,7 +200,11 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
               Navigator.pop(ctx);
               AppToast.showSuccess(context, 'Cloudinary settings updated!', title: 'Saved');
             },
-            child: const Text('Save & Apply'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Save & Apply', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -1418,11 +1474,46 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
             child: Column(
               children: [
                 if (_isUploadingImage) ...[
-                  const CircularProgressIndicator(color: AppTheme.primaryColor),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: CircularProgressIndicator(
+                          value: _imageUploadProgress > 0 ? _imageUploadProgress : null,
+                          color: AppTheme.primaryColor,
+                          backgroundColor: AppTheme.primaryColor.withOpacity(0.15),
+                          strokeWidth: 4,
+                        ),
+                      ),
+                      Text(
+                        '${(_imageUploadProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
-                  const Text(
-                    'Uploading image to Cloudinary...',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                  Text(
+                    'Uploading image to Cloudinary (${(_imageUploadProgress * 100).toInt()}%)...',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: _imageUploadProgress > 0 ? _imageUploadProgress : null,
+                        minHeight: 6,
+                        backgroundColor: Colors.blue.shade50,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
                   ),
                 ] else ...[
                   ElevatedButton.icon(
@@ -1488,47 +1579,46 @@ class _AdminEditProductScreenState extends State<AdminEditProductScreen> {
           ),
           const SizedBox(height: 10),
           const Text('Or Select Preset Photo:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
-          const SizedBox(height: 6),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _sampleImagePresets.map((preset) {
-                final isActive = _imageUrlController.text == preset['url'];
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _imageUrlController.text = preset['url']!),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: isActive ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: isActive ? [
-                          BoxShadow(color: AppTheme.primaryColor.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2)),
-                        ] : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.photo_size_select_actual_outlined, size: 14,
-                            color: isActive ? Colors.white : const Color(0xFF64748B)),
-                          const SizedBox(width: 5),
-                          Text(
-                            preset['title']!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                              color: isActive ? Colors.white : const Color(0xFF475569),
-                            ),
-                          ),
-                        ],
-                      ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _sampleImagePresets.map((preset) {
+              final isActive = _imageUrlController.text == preset['url'];
+              return GestureDetector(
+                onTap: () => setState(() => _imageUrlController.text = preset['url']!),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isActive ? AppTheme.primaryColor : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isActive ? AppTheme.primaryColor : const Color(0xFFE2E8F0),
                     ),
+                    boxShadow: isActive ? [
+                      BoxShadow(color: AppTheme.primaryColor.withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2)),
+                    ] : null,
                   ),
-                );
-              }).toList(),
-            ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.photo_size_select_actual_outlined, size: 14,
+                        color: isActive ? Colors.white : const Color(0xFF64748B)),
+                      const SizedBox(width: 5),
+                      Text(
+                        preset['title']!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                          color: isActive ? Colors.white : const Color(0xFF475569),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

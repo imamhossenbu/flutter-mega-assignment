@@ -193,6 +193,30 @@ class OrderModel {
         (map['grandTotal'] as num?)?.toDouble() ??
         0.0;
 
+    DateTime parseDate(dynamic val) {
+      if (val == null) return DateTime.now();
+      if (val is DateTime) return val;
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      try {
+        return (val as dynamic).toDate() as DateTime;
+      } catch (_) {
+        return DateTime.now();
+      }
+    }
+
+    DateTime? parseNullableDate(dynamic val) {
+      if (val == null) return null;
+      if (val is DateTime) return val;
+      if (val is String) return DateTime.tryParse(val);
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      try {
+        return (val as dynamic).toDate() as DateTime;
+      } catch (_) {
+        return null;
+      }
+    }
+
     return OrderModel(
       id: docId ?? map['id'] as String? ?? '',
       userId: map['userId'] as String? ?? '',
@@ -211,12 +235,8 @@ class OrderModel {
       totalAmount: total,
       promoCode: map['promoCode'] as String?,
       status: status,
-      createdAt: map['createdAt'] != null
-          ? DateTime.tryParse(map['createdAt'] as String) ?? DateTime.now()
-          : DateTime.now(),
-      updatedAt: map['updatedAt'] != null
-          ? DateTime.tryParse(map['updatedAt'] as String)
-          : null,
+      createdAt: parseDate(map['createdAt']),
+      updatedAt: parseNullableDate(map['updatedAt']),
     );
   }
 

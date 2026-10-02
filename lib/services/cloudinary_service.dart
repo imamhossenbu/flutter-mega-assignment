@@ -64,8 +64,12 @@ class CloudinaryService {
     }
   }
 
-  /// Uploads raw image bytes to Cloudinary using Unsigned Upload with preset
-  Future<String?> uploadImageBytes(Uint8List bytes, {String filename = 'product.jpg'}) async {
+  /// Uploads raw image bytes to Cloudinary using Unsigned Upload with preset and optional progress callback
+  Future<String?> uploadImageBytes(
+    Uint8List bytes, {
+    String filename = 'product.jpg',
+    void Function(double progress)? onProgress,
+  }) async {
     final cName = cloudName;
     final preset = uploadPreset;
 
@@ -75,6 +79,8 @@ class CloudinaryService {
         'CLOUDINARY_UPLOAD_PRESET are set in your .env file.',
       );
     }
+
+    onProgress?.call(0.12);
 
     final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cName/image/upload');
     final request = http.MultipartRequest('POST', uri)
@@ -87,14 +93,30 @@ class CloudinaryService {
         ),
       );
 
+    onProgress?.call(0.25);
+
+    double currentProgress = 0.25;
+    final timer = Stream.periodic(const Duration(milliseconds: 120)).listen((_) {
+      if (currentProgress < 0.88) {
+        currentProgress += 0.07;
+        if (currentProgress > 0.88) currentProgress = 0.88;
+        onProgress?.call(currentProgress);
+      }
+    });
+
     try {
       final streamedResponse = await request.send();
+      await timer.cancel();
+      onProgress?.call(0.92);
+
       final response = await http.Response.fromStream(streamedResponse);
+      onProgress?.call(0.97);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         final secureUrl = data['secure_url'] as String?;
         if (secureUrl != null && secureUrl.isNotEmpty) {
+          onProgress?.call(1.0);
           debugPrint('Cloudinary unsigned upload success: $secureUrl');
           return secureUrl;
         }
@@ -104,6 +126,8 @@ class CloudinaryService {
       final errorMsg = data['error']?['message'] ?? 'Upload failed with HTTP ${response.statusCode}';
       throw Exception(errorMsg);
     } catch (e) {
+      await timer.cancel();
+      onProgress?.call(0.0);
       debugPrint('Cloudinary upload exception: $e');
       rethrow;
     }

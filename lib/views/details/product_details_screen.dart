@@ -10,6 +10,7 @@ import '../../models/product_model.dart';
 import '../../models/review_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/product_provider.dart';
 import '../../providers/review_provider.dart';
 import '../../providers/wishlist_provider.dart';
 
@@ -54,7 +55,22 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final product = widget.product;
+    final productProvider = context.watch<ProductProvider>();
+    final liveProduct = productProvider.allProducts.firstWhere(
+      (p) => p.id == widget.product.id,
+      orElse: () => widget.product,
+    );
+    final product = liveProduct;
+
+    final reviewProvider = context.watch<ReviewProvider>();
+    final liveReviews = reviewProvider.getReviews(product.id);
+    final hasLoadedReviews = reviewProvider.hasLoaded(product.id);
+
+    final dynamicReviewCount = hasLoadedReviews ? liveReviews.length : product.reviewCount;
+    final dynamicRating = liveReviews.isNotEmpty
+        ? (liveReviews.fold<double>(0.0, (acc, r) => acc + r.rating) / liveReviews.length)
+        : (hasLoadedReviews && liveReviews.isEmpty ? 0.0 : product.rating);
+
     final wishlistProvider = context.watch<WishlistProvider>();
     final isWishlisted = wishlistProvider.isInWishlist(product.id);
 
@@ -172,62 +188,66 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 children: [
                   // Category & Stock Status
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppTheme.primaryColor.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              product.category.toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryColor,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ),
-                          if (product.displayQuantity.isNotEmpty) ...[
-                            const SizedBox(width: 8),
+                      Expanded(
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: const Color(0xFFCBD5E1)),
+                                color: AppTheme.primaryColor.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                product.displayQuantity,
+                                product.category.toUpperCase(),
                                 style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF475569),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryColor,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ),
+                            if (product.displayQuantity.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Text(
+                                  product.displayQuantity,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
                           ],
-                        ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Container(
-                            width: 8,
-                            height: 8,
+                            width: 7,
+                            height: 7,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: product.inStock ? AppTheme.success : AppTheme.error,
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           Text(
                             product.inStock ? product.stockDisplay : 'Out of Stock',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.w600,
                               color: product.inStock ? AppTheme.success : AppTheme.error,
                             ),
@@ -253,12 +273,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   // Brand & Rating Row
                   Row(
                     children: [
-                      Text(
-                        'By ${product.brand}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textSecondary,
+                      Flexible(
+                        child: Text(
+                          'By ${product.brand}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -274,7 +298,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       const Icon(Icons.star_rounded, color: AppTheme.starGold, size: 18),
                       const SizedBox(width: 4),
                       Text(
-                        '${product.rating}',
+                        dynamicRating > 0 ? dynamicRating.toStringAsFixed(1) : 'New',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -283,7 +307,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '(${product.reviewCount} reviews)',
+                        '($dynamicReviewCount ${dynamicReviewCount == 1 ? 'review' : 'reviews'})',
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppTheme.textMuted,
@@ -470,8 +494,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
 
       // 3. Sticky Bottom Action Bar with Quantity Counter & Add to Cart
-      bottomSheet: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -493,27 +517,37 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               Container(
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppTheme.cardBorder),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.remove, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      icon: const Icon(Icons.remove, size: 16),
                       onPressed: _quantity > 1
                           ? () => setState(() => _quantity--)
                           : null,
                     ),
-                    Text(
-                      product.unit != 'pcs' ? '$_quantity ${product.unit}' : '$_quantity',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        product.unit != 'pcs' ? '$_quantity ${product.unit}' : '$_quantity',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.add, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                      icon: const Icon(Icons.add, size: 16),
                       onPressed: _quantity < product.stockCount
                           ? () => setState(() => _quantity++)
                           : null,
@@ -521,7 +555,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
 
               // Add to Cart Button
               Expanded(
@@ -543,21 +577,27 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+                    minimumSize: const Size.fromHeight(46),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.shopping_bag_outlined, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Add to Cart • ${AppConstants.formatCurrency(product.price * _quantity)}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.shopping_bag_outlined, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Add to Cart • ${AppConstants.formatCurrency(product.price * _quantity)}',
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -591,7 +631,7 @@ class _ReviewsSectionState extends State<_ReviewsSection> {
 
   void _showWriteReviewSheet(BuildContext context) {
     final auth = context.read<AuthProvider>();
-    if (auth.isGuest) {
+    if (!auth.isAuthenticated) {
       AppToast.showWarning(context, 'Please sign in to write a review', title: 'Sign In Required');
       return;
     }

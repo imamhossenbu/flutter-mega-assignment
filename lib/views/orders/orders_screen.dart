@@ -19,7 +19,7 @@ class OrdersScreen extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final orderProvider = context.watch<OrderProvider>();
 
-    if (auth.isGuest && orderProvider.orders.isEmpty) {
+    if (!auth.isAuthenticated) {
       return Scaffold(
         backgroundColor: AppTheme.background,
         appBar: AppBar(title: const Text('My Orders')),
